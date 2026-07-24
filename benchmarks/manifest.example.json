@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "tracks": [
+    {
+      "id": "constant-tempo-example",
+      "path": "local/constant-tempo-example.flac",
+      "split": "evaluation",
+      "expected_bpm": 128.0,
+      "expected_key": "A minor"
+    },
+    {
+      "id": "tempo-change-example",
+      "path": "local/tempo-change-example.wav",
+      "split": "evaluation",
+      "expected_tempo_segments": [
+        {
+          "start_seconds": 0.0,
+          "end_seconds": 45.0,
+          "bpm": 100.0
+        },
+        {
+          "start_seconds": 45.0,
+          "end_seconds": 90.0,
+          "bpm": 120.0
+        }
+      ]
+    }
+  ]
+}
