@@ -1,0 +1,11 @@
+/target/
+*.wav
+*.aiff
+*.aif
+*.flac
+*.mp3
+*.m4a
+*.ogg
+/benchmarks/local/
+/benchmarks/*.private.json
+/benchmark-results/

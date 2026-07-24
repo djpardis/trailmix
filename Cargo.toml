@@ -1,0 +1,32 @@
+[workspace]
+members = [
+    "crates/beat-salad",
+    "crates/key-lime",
+    "crates/sampler-platter",
+    "crates/trailmix",
+    "crates/trailmix-bench",
+    "crates/trailmix-cli",
+    "crates/trailmix-codecs",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/djpardis/trailmix"
+rust-version = "1.85"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+float_cmp = "allow"
