@@ -65,6 +65,21 @@ error, exact key accuracy, local tempo-segment error, decoding time, and
 analysis time. Reports include track IDs but not source paths. Do not commit
 private manifests, recordings, or generated reports.
 
+## Test Kitchen
+
+Test Kitchen is a loopback-only annotation interface for private benchmark
+manifests:
+
+```sh
+cargo run -p test-kitchen -- benchmarks/manifest.private.json
+```
+
+It opens in the default browser and provides local audio playback, tap tempo,
+reference BPM and key fields, Serato observations, beat timestamps, tempo and
+key segments, combined beat-switch events, reviewer status, and on-demand Trail
+Mix analysis. Every save validates and rewrites the manifest through a
+temporary file.
+
 ## Development
 
 ```sh
@@ -90,6 +105,9 @@ The next milestone is a reproducible benchmark covering:
 
 Published accuracy claims should be based on held-out, legally usable data and
 immutable source revisions.
+
+See [ROADMAP.md](ROADMAP.md) for time-varying BPM, key, and structural
+beat-switch detection milestones.
 
 ## License
 

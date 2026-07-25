@@ -3,10 +3,12 @@ members = [
     "crates/beat-salad",
     "crates/key-lime",
     "crates/sampler-platter",
+    "crates/test-kitchen",
     "crates/trailmix",
     "crates/trailmix-bench",
     "crates/trailmix-cli",
     "crates/trailmix-codecs",
+    "crates/trailmix-manifest",
 ]
 resolver = "2"
 
