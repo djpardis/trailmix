@@ -1,14 +1,8 @@
-use std::{
-    env,
-    error::Error,
-    fs,
-    path::{Path, PathBuf},
-    process::ExitCode,
-    time::Instant,
-};
+use std::{env, error::Error, path::Path, process::ExitCode, time::Instant};
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use trailmix::{Analysis, AnalysisConfig, AudioBuffer, Mode, MusicalKey, PitchClass};
+use trailmix_manifest::{TempoSegmentAnnotation, TrackAnnotation};
 
 const SAMPLE_RATE: u32 = 44_100;
 const DURATION_SECONDS: u32 = 20;
@@ -28,33 +22,6 @@ struct SyntheticCase {
     absolute_error: Option<f32>,
     confidence: f32,
     elapsed_milliseconds: f64,
-}
-
-#[derive(Debug, Deserialize)]
-struct BenchmarkManifest {
-    version: u32,
-    tracks: Vec<ManifestTrack>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ManifestTrack {
-    id: String,
-    path: PathBuf,
-    #[serde(default)]
-    split: Option<String>,
-    #[serde(default)]
-    expected_bpm: Option<f32>,
-    #[serde(default)]
-    expected_key: Option<String>,
-    #[serde(default)]
-    expected_tempo_segments: Vec<ExpectedTempoSegment>,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize)]
-struct ExpectedTempoSegment {
-    start_seconds: f64,
-    end_seconds: f64,
-    bpm: f32,
 }
 
 #[derive(Serialize)]
@@ -189,7 +156,7 @@ fn synthetic_track(bpm: f32) -> Vec<f32> {
 }
 
 fn run_manifest(path: &Path) -> Result<CorpusBenchmark, Box<dyn Error>> {
-    let manifest: BenchmarkManifest = serde_json::from_slice(&fs::read(path)?)?;
+    let manifest = trailmix_manifest::load(path)?;
     let base_directory = path.parent().unwrap_or_else(|| Path::new("."));
     let tracks = manifest
         .tracks
@@ -207,7 +174,7 @@ fn run_manifest(path: &Path) -> Result<CorpusBenchmark, Box<dyn Error>> {
     })
 }
 
-fn analyze_manifest_track(track: &ManifestTrack, base_directory: &Path) -> TrackResult {
+fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> TrackResult {
     let path = if track.path.is_absolute() {
         track.path.clone()
     } else {
@@ -260,7 +227,7 @@ fn analyze_manifest_track(track: &ManifestTrack, base_directory: &Path) -> Track
     }
 }
 
-fn failed_track(track: &ManifestTrack, error: String) -> TrackResult {
+fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
     TrackResult {
         id: track.id.clone(),
         split: track.split.clone(),
@@ -293,7 +260,7 @@ fn octave_aware_error(expected: f32, detected: f32) -> f32 {
     .fold(f32::INFINITY, f32::min)
 }
 
-fn tempo_segment_error(expected: &[ExpectedTempoSegment], analysis: &Analysis) -> Option<f32> {
+fn tempo_segment_error(expected: &[TempoSegmentAnnotation], analysis: &Analysis) -> Option<f32> {
     if expected.is_empty() {
         return None;
     }
@@ -404,7 +371,10 @@ fn parse_key(value: &str) -> Result<MusicalKey, String> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     use hound::{SampleFormat, WavSpec, WavWriter};
 

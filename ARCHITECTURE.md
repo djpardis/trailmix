@@ -17,9 +17,12 @@ command-line, and research tools without coupling them to one application.
 - `sampler-platter` bins PCM into min, max, and RMS waveform columns.
 - `trailmix-codecs` provides separately selectable common-format decoders and
   downmixes decoded channels to mono PCM.
+- `trailmix-manifest` defines and validates shared private-corpus annotations.
 - `trailmix-cli` analyzes one supported audio file for manual evaluation.
 - `trailmix-bench` emits machine-readable synthetic or manifest-driven
   real-track benchmark results.
+- `test-kitchen` serves a loopback-only browser interface for playback,
+  annotation, Serato observations, and on-demand analysis.
 
 ## Result stability
 
