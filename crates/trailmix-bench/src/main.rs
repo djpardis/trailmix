@@ -2,7 +2,7 @@ use std::{env, error::Error, path::Path, process::ExitCode, time::Instant};
 
 use serde::Serialize;
 use trailmix::{Analysis, AnalysisConfig, AudioBuffer, Mode, MusicalKey, PitchClass};
-use trailmix_manifest::{TempoSegmentAnnotation, TrackAnnotation};
+use trailmix_manifest::{KeySegmentAnnotation, TempoSegmentAnnotation, TrackAnnotation};
 
 const SAMPLE_RATE: u32 = 44_100;
 const DURATION_SECONDS: u32 = 20;
@@ -41,6 +41,7 @@ struct CorpusSummary {
     bpm_octave_aware_mean_absolute_error: Option<f32>,
     exact_key_accuracy: Option<f32>,
     tempo_segment_mean_absolute_error: Option<f32>,
+    key_segment_exact_accuracy: Option<f32>,
     mean_decode_milliseconds: Option<f64>,
     mean_analysis_milliseconds: Option<f64>,
 }
@@ -60,6 +61,7 @@ struct TrackResult {
     detected_key: Option<String>,
     exact_key_match: Option<bool>,
     tempo_segment_mean_absolute_error: Option<f32>,
+    key_segment_exact_accuracy: Option<f32>,
     error: Option<String>,
 }
 
@@ -205,6 +207,11 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         .map(|(expected, detected)| (detected - expected).abs());
     let bpm_octave_aware_absolute_error = paired_bpm(track.expected_bpm, analysis.beat.global_bpm)
         .map(|(expected, detected)| octave_aware_error(expected, detected));
+    let key_segment_exact_accuracy =
+        match key_segment_accuracy(&track.expected_key_segments, &analysis) {
+            Ok(accuracy) => accuracy,
+            Err(error) => return failed_track(track, error),
+        };
 
     TrackResult {
         id: track.id.clone(),
@@ -223,6 +230,7 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
             &track.expected_tempo_segments,
             &analysis,
         ),
+        key_segment_exact_accuracy,
         error: None,
     }
 }
@@ -242,6 +250,7 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         detected_key: None,
         exact_key_match: None,
         tempo_segment_mean_absolute_error: None,
+        key_segment_exact_accuracy: None,
         error: Some(error),
     }
 }
@@ -282,6 +291,33 @@ fn tempo_segment_error(expected: &[TempoSegmentAnnotation], analysis: &Analysis)
     mean_f32(&errors)
 }
 
+fn key_segment_accuracy(
+    expected: &[KeySegmentAnnotation],
+    analysis: &Analysis,
+) -> Result<Option<f32>, String> {
+    if expected.is_empty() {
+        return Ok(None);
+    }
+
+    let mut annotated_seconds = 0.0;
+    let mut matching_seconds = 0.0;
+    for expected_segment in expected {
+        let expected_key = parse_key(&expected_segment.key)?;
+        annotated_seconds += expected_segment.end_seconds - expected_segment.start_seconds;
+        for detected in &analysis.key.segments {
+            let overlap_start = expected_segment.start_seconds.max(detected.start_seconds);
+            let overlap_end = expected_segment.end_seconds.min(detected.end_seconds);
+            if overlap_end > overlap_start && detected.key == expected_key {
+                matching_seconds += overlap_end - overlap_start;
+            }
+        }
+    }
+
+    Ok(Some(
+        (matching_seconds / annotated_seconds.max(f64::EPSILON)) as f32,
+    ))
+}
+
 fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
     let bpm_errors = tracks
         .iter()
@@ -298,6 +334,10 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
     let segment_errors = tracks
         .iter()
         .filter_map(|track| track.tempo_segment_mean_absolute_error)
+        .collect::<Vec<_>>();
+    let key_segment_accuracies = tracks
+        .iter()
+        .filter_map(|track| track.key_segment_exact_accuracy)
         .collect::<Vec<_>>();
     let decode_times = tracks
         .iter()
@@ -320,6 +360,7 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
                 .collect::<Vec<_>>(),
         ),
         tempo_segment_mean_absolute_error: mean_f32(&segment_errors),
+        key_segment_exact_accuracy: mean_f32(&key_segment_accuracies),
         mean_decode_milliseconds: mean_f64(&decode_times),
         mean_analysis_milliseconds: mean_f64(&analysis_times),
     }
@@ -394,6 +435,43 @@ mod tests {
     #[test]
     fn treats_half_time_as_octave_equivalent() {
         assert!((octave_aware_error(128.0, 64.0)).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn scores_exact_local_key_overlap() {
+        let sample_rate = 8_000;
+        let samples = (0..sample_rate * 4)
+            .map(|index| {
+                [220.0_f32, 277.18, 329.63]
+                    .iter()
+                    .map(|frequency| {
+                        (2.0 * std::f32::consts::PI * frequency * index as f32 / sample_rate as f32)
+                            .sin()
+                    })
+                    .sum::<f32>()
+                    / 3.0
+            })
+            .collect::<Vec<_>>();
+        let analysis = trailmix::analyze(
+            AudioBuffer {
+                samples: &samples,
+                sample_rate,
+            },
+            AnalysisConfig::default(),
+        );
+        let accuracy = key_segment_accuracy(
+            &[KeySegmentAnnotation {
+                start_seconds: 0.0,
+                end_seconds: 4.0,
+                key: "A major".to_owned(),
+                confidence: None,
+            }],
+            &analysis,
+        )
+        .expect("valid key")
+        .expect("accuracy");
+
+        assert!((accuracy - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]
