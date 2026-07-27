@@ -5,6 +5,12 @@
       "id": "constant-tempo-example",
       "path": "local/constant-tempo-example.flac",
       "split": "evaluation",
+      "source": {
+        "name": "Example dataset",
+        "version": "1",
+        "item_id": "constant-tempo-example",
+        "citation": "Example citation"
+      },
       "expected_bpm": 128.0,
       "expected_key": "A minor",
       "serato": {

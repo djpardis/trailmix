@@ -33,6 +33,8 @@ pub struct TrackAnnotation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub split: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<DatasetReference>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_bpm: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_key: Option<String>,
@@ -48,6 +50,15 @@ pub struct TrackAnnotation {
     pub serato: Option<SeratoObservation>,
     #[serde(default)]
     pub annotation: AnnotationMetadata,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DatasetReference {
+    pub name: String,
+    pub version: String,
+    pub item_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub citation: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -251,6 +262,13 @@ pub fn save(path: impl AsRef<Path>, manifest: &AnnotationManifest) -> Result<(),
         path: temporary_path.clone(),
         source,
     })?;
+    #[cfg(windows)]
+    if path.exists() {
+        fs::remove_file(path).map_err(|source| ManifestError::Write {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    }
     fs::rename(&temporary_path, path).map_err(|source| ManifestError::Write {
         path: path.to_path_buf(),
         source,
@@ -411,6 +429,7 @@ mod tests {
             id: "example".to_owned(),
             path: PathBuf::from("local/example.wav"),
             split: Some("evaluation".to_owned()),
+            source: None,
             expected_bpm: Some(120.0),
             expected_key: Some("A minor".to_owned()),
             expected_beats: Vec::new(),

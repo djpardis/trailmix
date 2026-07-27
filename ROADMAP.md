@@ -22,12 +22,14 @@ these as separate observations that can occur together.
 
 - Beat Salad estimates global BPM, beat positions, and preliminary local tempo
   segments.
-- Key Lime estimates one global major or minor key.
+- Key Lime estimates global key and preliminary windowed key segments.
 - Sampler Platter generates compact waveform summaries.
 - Trail Mix combines the three analyzers behind a versioned PCM-in/results-out
   API.
 - The benchmark harness measures global BPM, octave-aware BPM, key, local
   tempo-segment, decoding, and runtime results.
+- The dataset importer loads GiantSteps Tempo v2 and GiantSteps Key labels into
+  provenance-aware benchmark manifests.
 - Test Kitchen edits validated private manifests with audio playback, tap
   tempo, BPM and key segments, combined beat-switch events, Serato
   observations, reviewer metadata, and on-demand Trail Mix predictions.
@@ -44,7 +46,8 @@ these as separate observations that can occur together.
 
 ### Key Lime
 
-- Calculate chroma or HPCP features over overlapping windows.
+- Replace the initial frame-level chroma with a higher-resolution HPCP where
+  evaluation shows it improves boundaries or classification.
 - Estimate tuning offset before key classification.
 - Smooth unstable frame-level estimates without erasing short real sections.
 - Detect key-change boundaries and return local key segments.

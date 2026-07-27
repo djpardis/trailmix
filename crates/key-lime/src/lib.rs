@@ -89,6 +89,15 @@ pub struct KeyAnalysis {
     pub key: Option<MusicalKey>,
     pub confidence: f32,
     pub chroma: [f32; 12],
+    pub segments: Vec<KeySegment>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct KeySegment {
+    pub start_seconds: f64,
+    pub end_seconds: f64,
+    pub key: MusicalKey,
+    pub confidence: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -97,6 +106,8 @@ pub struct KeyConfig {
     pub hop_size: usize,
     pub minimum_midi_note: u8,
     pub maximum_midi_note: u8,
+    pub local_window_seconds: f32,
+    pub local_hop_seconds: f32,
 }
 
 impl Default for KeyConfig {
@@ -106,11 +117,26 @@ impl Default for KeyConfig {
             hop_size: 2_048,
             minimum_midi_note: 36,
             maximum_midi_note: 95,
+            local_window_seconds: 12.0,
+            local_hop_seconds: 6.0,
         }
     }
 }
 
-/// Estimate a global major or minor key from mono PCM.
+#[derive(Debug, Clone)]
+struct FrameChroma {
+    center_seconds: f64,
+    values: [f32; 12],
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LocalEstimate {
+    center_seconds: f64,
+    key: MusicalKey,
+    confidence: f32,
+}
+
+/// Estimate global and local major or minor keys from mono PCM.
 #[must_use]
 pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnalysis {
     if sample_rate == 0
@@ -118,12 +144,14 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
         || config.hop_size == 0
         || samples.len() < config.frame_size
         || config.minimum_midi_note > config.maximum_midi_note
+        || config.local_window_seconds <= 0.0
+        || config.local_hop_seconds <= 0.0
     {
         return empty_analysis();
     }
 
     let mut chroma = [0.0_f32; 12];
-    let mut frame_count = 0_u32;
+    let mut frame_chromas = Vec::new();
     let mut start = 0;
     while start + config.frame_size <= samples.len() {
         let frame = &samples[start..start + config.frame_size];
@@ -135,42 +163,154 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
             / config.frame_size as f32;
 
         if frame_energy > 1.0e-8 {
-            accumulate_chroma(frame, sample_rate, config, &mut chroma);
-            frame_count += 1;
+            let mut frame_chroma = [0.0; 12];
+            accumulate_chroma(frame, sample_rate, config, &mut frame_chroma);
+            for (total, value) in chroma.iter_mut().zip(frame_chroma) {
+                *total += value;
+            }
+            frame_chromas.push(FrameChroma {
+                center_seconds: (start + config.frame_size / 2) as f64 / f64::from(sample_rate),
+                values: frame_chroma,
+            });
         }
         start += config.hop_size;
     }
 
     let total = chroma.iter().sum::<f32>();
-    if frame_count == 0 || total <= f32::EPSILON {
+    if frame_chromas.is_empty() || total <= f32::EPSILON {
         return empty_analysis();
     }
-    for value in &mut chroma {
-        *value /= total;
-    }
+    normalize_chroma(&mut chroma);
 
     let (key, best_score, second_score) = classify_key(&chroma);
-    let confidence = if best_score.abs() > f32::EPSILON {
-        ((best_score - second_score) / best_score.abs()).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
+    let confidence = key_confidence(best_score, second_score);
+    let duration_seconds = samples.len() as f64 / f64::from(sample_rate);
+    let segments = estimate_segments(&frame_chromas, duration_seconds, key, confidence, config);
 
     KeyAnalysis {
-        version: 1,
+        version: 2,
         key: Some(key),
         confidence,
         chroma,
+        segments,
     }
 }
 
 fn empty_analysis() -> KeyAnalysis {
     KeyAnalysis {
-        version: 1,
+        version: 2,
         key: None,
         confidence: 0.0,
         chroma: [0.0; 12],
+        segments: Vec::new(),
     }
+}
+
+fn normalize_chroma(chroma: &mut [f32; 12]) {
+    let total = chroma.iter().sum::<f32>();
+    if total > f32::EPSILON {
+        for value in chroma {
+            *value /= total;
+        }
+    }
+}
+
+fn key_confidence(best_score: f32, second_score: f32) -> f32 {
+    if best_score.abs() > f32::EPSILON {
+        ((best_score - second_score) / best_score.abs()).clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+fn estimate_segments(
+    frames: &[FrameChroma],
+    duration_seconds: f64,
+    global_key: MusicalKey,
+    global_confidence: f32,
+    config: KeyConfig,
+) -> Vec<KeySegment> {
+    let window = f64::from(config.local_window_seconds);
+    let hop = f64::from(config.local_hop_seconds);
+    if duration_seconds < window + hop {
+        return vec![KeySegment {
+            start_seconds: 0.0,
+            end_seconds: duration_seconds,
+            key: global_key,
+            confidence: global_confidence,
+        }];
+    }
+
+    let mut local = Vec::new();
+    let mut window_start = 0.0;
+    while window_start + window <= duration_seconds {
+        let window_end = window_start + window;
+        let mut chroma = [0.0; 12];
+        let mut frame_count = 0;
+        for frame in frames.iter().filter(|frame| {
+            frame.center_seconds >= window_start && frame.center_seconds < window_end
+        }) {
+            for (total, value) in chroma.iter_mut().zip(frame.values) {
+                *total += value;
+            }
+            frame_count += 1;
+        }
+        if frame_count > 0 {
+            normalize_chroma(&mut chroma);
+            let (key, best_score, second_score) = classify_key(&chroma);
+            local.push(LocalEstimate {
+                center_seconds: window_start + window / 2.0,
+                key,
+                confidence: key_confidence(best_score, second_score),
+            });
+        }
+        window_start += hop;
+    }
+
+    if local.is_empty() {
+        return vec![KeySegment {
+            start_seconds: 0.0,
+            end_seconds: duration_seconds,
+            key: global_key,
+            confidence: global_confidence,
+        }];
+    }
+
+    let mut groups = vec![(0, 1)];
+    for index in 1..local.len() {
+        if local[index].key == local[index - 1].key {
+            groups.last_mut().expect("initial group").1 = index + 1;
+        } else {
+            groups.push((index, index + 1));
+        }
+    }
+
+    groups
+        .iter()
+        .enumerate()
+        .map(|(group_index, &(first, end))| {
+            let start_seconds = if group_index == 0 {
+                0.0
+            } else {
+                f64::midpoint(local[first - 1].center_seconds, local[first].center_seconds)
+            };
+            let end_seconds = if end == local.len() {
+                duration_seconds
+            } else {
+                f64::midpoint(local[end - 1].center_seconds, local[end].center_seconds)
+            };
+            KeySegment {
+                start_seconds,
+                end_seconds,
+                key: local[first].key,
+                confidence: local[first..end]
+                    .iter()
+                    .map(|estimate| estimate.confidence)
+                    .sum::<f32>()
+                    / (end - first) as f32,
+            }
+        })
+        .collect()
 }
 
 fn accumulate_chroma(frame: &[f32], sample_rate: u32, config: KeyConfig, chroma: &mut [f32; 12]) {
@@ -290,6 +430,47 @@ mod tests {
                 tonic: PitchClass::A,
                 mode: Mode::Major,
             })
+        );
+        assert_eq!(result.segments.len(), 1);
+        assert_eq!(result.segments[0].key, result.key.expect("key"));
+    }
+
+    #[test]
+    fn detects_a_piecewise_key_change() {
+        let sample_rate = 8_000;
+        let mut samples = chord(&[220.0, 277.18, 329.63], 8.0, sample_rate);
+        samples.extend(chord(&[261.63, 311.13, 392.0], 8.0, sample_rate));
+
+        let result = analyze(
+            &samples,
+            sample_rate,
+            KeyConfig {
+                frame_size: 2_048,
+                hop_size: 1_024,
+                local_window_seconds: 4.0,
+                local_hop_seconds: 2.0,
+                ..KeyConfig::default()
+            },
+        );
+
+        assert_eq!(
+            result.segments.first().expect("first segment").key.tonic,
+            PitchClass::A
+        );
+        assert_eq!(
+            result.segments.last().expect("last segment").key,
+            MusicalKey {
+                tonic: PitchClass::C,
+                mode: Mode::Minor,
+            }
+        );
+        assert!(
+            result
+                .segments
+                .iter()
+                .any(|segment| (segment.start_seconds - 8.0).abs() <= 2.0),
+            "{:?}",
+            result.segments
         );
     }
 
