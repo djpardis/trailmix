@@ -8,6 +8,7 @@ members = [
     "crates/trailmix-bench",
     "crates/trailmix-cli",
     "crates/trailmix-codecs",
+    "crates/trailmix-datasets",
     "crates/trailmix-manifest",
 ]
 resolver = "2"

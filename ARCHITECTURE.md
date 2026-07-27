@@ -12,12 +12,15 @@ command-line, and research tools without coupling them to one application.
 - `trailmix` is the facade and versioned aggregate result.
 - `beat-salad` calculates an energy-onset envelope, autocorrelation tempo
   candidates, a beat grid, and windowed tempo segments.
-- `key-lime` builds a pitch-class profile with windowed Goertzel measurements
-  and compares it with rotated major and minor key profiles.
+- `key-lime` builds frame-level pitch-class profiles with Goertzel
+  measurements, compares global and local windows with rotated major and minor
+  key profiles, and merges adjacent matching local estimates into segments.
 - `sampler-platter` bins PCM into min, max, and RMS waveform columns.
 - `trailmix-codecs` provides separately selectable common-format decoders and
   downmixes decoded channels to mono PCM.
 - `trailmix-manifest` defines and validates shared private-corpus annotations.
+- `trailmix-datasets` imports GiantSteps Tempo v2 and GiantSteps Key reference
+  annotations into the shared manifest while retaining dataset provenance.
 - `trailmix-cli` analyzes one supported audio file for manual evaluation.
 - `trailmix-bench` emits machine-readable synthetic or manifest-driven
   real-track benchmark results.
@@ -36,7 +39,9 @@ own policy requires it.
 - Tempo estimation uses a compact energy-flux baseline, not a trained model.
 - Tempo segments represent locally stable estimates and do not yet model a
   continuous ramp between two BPM values.
-- Key estimation does not yet estimate tuning offset or key changes.
+- Key segmentation is preliminary and does not yet estimate tuning offset,
+  smooth short unstable classifications, or represent modal and no-key
+  sections.
 - The decoder supports MP3, FLAC, AIFF, WAV, AAC-in-MP4, and ALAC-in-MP4 when
   the corresponding Cargo features are enabled.
 - Confidence values are preliminary and have not been calibrated on held-out

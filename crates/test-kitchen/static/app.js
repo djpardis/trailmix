@@ -340,6 +340,7 @@ async function runAnalysis() {
       metric("Global key", keyLabel(analysis.key.key)),
       metric("Key confidence", analysis.key.confidence.toFixed(3)),
       metric("Tempo segments", String(analysis.beat.tempo_segments.length)),
+      metric("Key segments", String(analysis.key.segments.length)),
       metric("Detected beats", String(analysis.beat.beats.length)),
       metric("Duration", formatTime(analysis.duration_seconds)),
       metric("Waveform columns", String(analysis.waveform.columns.length)),
