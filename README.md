@@ -1,24 +1,40 @@
 # Trail Mix
 
-Trail Mix is an experimental, offline audio-analysis toolkit written in Rust. It
-accepts normalized mono PCM and produces tempo, musical-key, and compact
-waveform data without a network service or model download.
+Trail Mix is an experimental Rust toolkit for offline audio analysis. It accepts
+normalized mono PCM and returns tempo, musical-key, and compact waveform data
+without a network service or model download.
 
-The current implementation is a research prototype. Its synthetic tests verify
-basic behavior, but its accuracy has not yet been established on a representative
-music corpus.
+Trail Mix is a research prototype. Its synthetic tests check basic behavior,
+but its accuracy and confidence values have not yet been validated on a
+representative music corpus.
 
-## Components
+## Quick start
 
-- **Beat Salad** estimates global BPM, beat positions, and local tempo segments.
-- **Key Lime** estimates a global major or minor key from chroma features.
-- **Sampler Platter** generates compact min/max/RMS waveform columns.
-- **Trail Mix** provides one PCM-in/results-out facade over all three analyzers.
+The workspace requires Rust 1.85 or newer. From a clone of this repository,
+analyze a supported audio file with:
 
-All components live in one Cargo workspace so they can share releases and test
-data while remaining independently usable.
+```sh
+cargo run -p trailmix-cli -- path/to/audio.flac
+```
+
+The CLI supports MP3, FLAC, AIFF, WAV, AAC-in-MP4, and ALAC-in-MP4. It prints
+versioned JSON containing global and local tempo estimates, beat positions,
+global and local key estimates, chroma, confidence values, and waveform
+columns.
+
+To check the toolkit without supplying an audio file, run its deterministic
+synthetic smoke benchmark:
+
+```sh
+cargo run --release -p trailmix-bench
+```
+
+The synthetic benchmark catches basic regressions. It does not measure accuracy
+on recorded music.
 
 ## Use the library
+
+The `trailmix` crate provides one PCM-in/results-out API:
 
 ```rust
 let analysis = trailmix::analyze(
@@ -30,86 +46,50 @@ let analysis = trailmix::analyze(
 );
 ```
 
-The core crates do not decode files. This keeps codec dependencies out of
-applications that already have PCM. The optional `trailmix-codecs` crate
-provides feature-gated MP3, FLAC, AIFF, WAV, AAC-in-MP4, and ALAC-in-MP4
-decoding. The included CLI enables those common formats:
+The core analysis crates do not decode files, so applications that already have
+PCM do not take on codec dependencies. The optional `trailmix-codecs` crate
+provides feature-gated file decoding.
 
-```sh
-cargo run -p trailmix-cli -- path/to/audio.flac
-```
+## Analysis components
 
-It prints versioned JSON containing BPM, confidence, beat positions, tempo
-segments, key, chroma, and waveform columns.
+- **Beat Salad** estimates global BPM, beat positions, and local tempo segments.
+- **Key Lime** estimates global and local major or minor keys from chroma
+  features.
+- **Sampler Platter** generates compact min/max/RMS waveform columns.
 
-Run the deterministic synthetic smoke benchmark with:
+The `trailmix` facade crate runs these three analyzers and returns their
+versioned results together. Each analyzer can also be used independently. See
+[ARCHITECTURE.md](ARCHITECTURE.md) for the complete crate map, processing
+boundary, result-versioning policy, and current limitations.
 
-```sh
-cargo run --release -p trailmix-bench
-```
+## Evaluation
 
-This benchmark catches basic regressions. It is not evidence of accuracy on
-recorded music.
+Real-track evaluation uses private, ignored manifests and audio files. The
+repository also includes tools for importing public annotations and reviewing
+them in the local Test Kitchen interface. See
+[BENCHMARKING.md](BENCHMARKING.md) for setup, supported metrics, dataset
+references, and data-handling rules.
 
-For private real-track evaluation, copy `benchmarks/manifest.example.json`,
-place audio under the ignored `benchmarks/local/` directory, add your
-annotations, and run:
+No accuracy claim should be based on the synthetic benchmark alone. Planned
+evaluation work and time-varying analysis milestones are tracked in
+[ROADMAP.md](ROADMAP.md).
 
-```sh
-cargo run --release -p trailmix-bench -- \
-  --manifest benchmarks/manifest.private.json
-```
+## Documentation
 
-The report contains per-track and aggregate global BPM error, octave-aware BPM
-error, exact key accuracy, local tempo-segment error, decoding time, and
-analysis time. Reports include track IDs but not source paths. Do not commit
-private manifests, recordings, or generated reports.
+- [Architecture](ARCHITECTURE.md)
+- [Benchmarking and annotation](BENCHMARKING.md)
+- [Contributing](CONTRIBUTING.md)
+- [Roadmap](ROADMAP.md)
+- [Third-party software](THIRD_PARTY.md)
 
-## Test Kitchen
+## Contributing
 
-Test Kitchen is a loopback-only annotation interface for private benchmark
-manifests:
-
-```sh
-cargo run -p test-kitchen -- benchmarks/manifest.private.json
-```
-
-It opens in the default browser and provides local audio playback, tap tempo,
-reference BPM and key fields, Serato observations, beat timestamps, tempo and
-key segments, combined beat-switch events, reviewer status, and on-demand Trail
-Mix analysis. Every save validates and rewrites the manifest through a
-temporary file.
-
-## Development
-
-```sh
-cargo fmt --all -- --check
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-```
-
-Do not commit commercial recordings or private benchmark data. The repository
-ignores common audio formats by default. Future public fixtures must have clear
-redistribution terms.
-
-## Research direction
-
-The next milestone is a reproducible benchmark covering:
-
-- exact and octave-aware global BPM accuracy
-- piecewise and gradually changing tempo
-- half-time and double-time ambiguity
-- global key accuracy and musically related errors
-- confidence calibration
-- runtime, memory use, and binary size
-
-Published accuracy claims should be based on held-out, legally usable data and
-immutable source revisions.
-
-See [ROADMAP.md](ROADMAP.md) for time-varying BPM, key, and structural
-beat-switch detection milestones.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development checks, public-data
+requirements, and the documentation checklist used to keep these files aligned
+with the code.
 
 ## License
 
-Trail Mix is available under either the MIT License or the Apache License,
-Version 2.0, at your option.
+Trail Mix is available under either the [MIT License](LICENSE-MIT) or the
+[Apache License, Version 2.0](LICENSE-APACHE), at your option. Codec-related
+notices are recorded in [THIRD_PARTY.md](THIRD_PARTY.md).
