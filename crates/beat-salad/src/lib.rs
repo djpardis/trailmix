@@ -87,7 +87,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: BeatConfig) -> BeatAna
         estimate_segments(&onset_envelope, envelope_rate, duration, config, global);
 
     BeatAnalysis {
-        version: 1,
+        version: 2,
         global_bpm: Some(global.bpm),
         confidence: global.confidence,
         beats,
@@ -97,7 +97,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: BeatConfig) -> BeatAna
 
 fn empty_analysis() -> BeatAnalysis {
     BeatAnalysis {
-        version: 1,
+        version: 2,
         global_bpm: None,
         confidence: 0.0,
         beats: Vec::new(),
@@ -156,9 +156,9 @@ fn estimate_tempo(
         return None;
     }
 
-    let min_lag = ((60.0 * envelope_rate / max_bpm).floor() as usize).max(1);
+    let min_lag = ((60.0 * envelope_rate / max_bpm).ceil() as usize).max(1);
     let max_lag =
-        ((60.0 * envelope_rate / min_bpm).ceil() as usize).min(onset.len().saturating_sub(1));
+        ((60.0 * envelope_rate / min_bpm).floor() as usize).min(onset.len().saturating_sub(1));
     if min_lag > max_lag {
         return None;
     }
@@ -215,7 +215,7 @@ fn estimate_tempo(
     } else {
         best_lag as f32
     };
-    let bpm = 60.0 * envelope_rate / period;
+    let bpm = (60.0 * envelope_rate / period).clamp(min_bpm, max_bpm);
     let periodicity = correlations[best_lag].clamp(0.0, 1.0);
     let separation = if best_score > f32::EPSILON {
         ((best_score - second_score.max(0.0)) / best_score).clamp(0.0, 1.0)
@@ -427,6 +427,20 @@ mod tests {
         assert!((bpm - 120.0).abs() < 2.0, "detected {bpm}");
         assert!(result.beats.len() >= 35);
         assert_eq!(result.tempo_segments.len(), 1);
+    }
+
+    #[test]
+    fn keeps_tempo_inside_the_configured_range() {
+        let samples = click_track(200.0, 20.0, 44_100);
+        let config = BeatConfig {
+            min_bpm: 80.0,
+            max_bpm: 200.0,
+            ..BeatConfig::default()
+        };
+        let result = analyze(&samples, 44_100, config);
+        let bpm = result.global_bpm.expect("tempo");
+
+        assert!((config.min_bpm..=config.max_bpm).contains(&bpm));
     }
 
     #[test]
