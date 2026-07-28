@@ -1,0 +1,17 @@
+{
+  "name": "trailmix-site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub Pages site for Trail Mix.",
+  "scripts": {
+    "start": "eleventy --serve --port=4175",
+    "build": "eleventy"
+  },
+  "devDependencies": {
+    "@11ty/eleventy": "^3.1.2",
+    "markdown-it": "^14.3.0"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.8"
+  }
+}
