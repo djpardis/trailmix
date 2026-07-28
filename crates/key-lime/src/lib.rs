@@ -165,6 +165,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
         if frame_energy > 1.0e-8 {
             let mut frame_chroma = [0.0; 12];
             accumulate_chroma(frame, sample_rate, config, &mut frame_chroma);
+            normalize_chroma(&mut frame_chroma);
             for (total, value) in chroma.iter_mut().zip(frame_chroma) {
                 *total += value;
             }
@@ -188,7 +189,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
     let segments = estimate_segments(&frame_chromas, duration_seconds, key, confidence, config);
 
     KeyAnalysis {
-        version: 2,
+        version: 3,
         key: Some(key),
         confidence,
         chroma,
@@ -198,7 +199,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
 
 fn empty_analysis() -> KeyAnalysis {
     KeyAnalysis {
-        version: 2,
+        version: 3,
         key: None,
         confidence: 0.0,
         chroma: [0.0; 12],
@@ -315,6 +316,7 @@ fn estimate_segments(
 
 fn accumulate_chroma(frame: &[f32], sample_rate: u32, config: KeyConfig, chroma: &mut [f32; 12]) {
     let nyquist_guard = sample_rate as f32 * 0.45;
+    let mut pitch_class_weights = [0.0; 12];
     for midi_note in config.minimum_midi_note..=config.maximum_midi_note {
         let frequency = 440.0 * 2.0_f32.powf((f32::from(midi_note) - 69.0) / 12.0);
         if frequency >= nyquist_guard {
@@ -323,7 +325,19 @@ fn accumulate_chroma(frame: &[f32], sample_rate: u32, config: KeyConfig, chroma:
 
         let magnitude = goertzel_power(frame, sample_rate, frequency);
         let pitch_class = usize::from(midi_note % 12);
-        chroma[pitch_class] += magnitude.sqrt() / frequency.sqrt();
+        let weight = 1.0 / frequency.sqrt();
+        chroma[pitch_class] += magnitude.sqrt() * weight;
+        pitch_class_weights[pitch_class] += weight;
+    }
+
+    normalize_pitch_class_weights(chroma, &pitch_class_weights);
+}
+
+fn normalize_pitch_class_weights(chroma: &mut [f32; 12], weights: &[f32; 12]) {
+    for (value, weight) in chroma.iter_mut().zip(weights) {
+        if *weight > f32::EPSILON {
+            *value /= *weight;
+        }
     }
 }
 
@@ -433,6 +447,21 @@ mod tests {
         );
         assert_eq!(result.segments.len(), 1);
         assert_eq!(result.segments[0].key, result.key.expect("key"));
+    }
+
+    #[test]
+    fn removes_frequency_weight_bias_between_pitch_classes() {
+        let config = KeyConfig::default();
+        let mut weights = [0.0; 12];
+        for midi_note in config.minimum_midi_note..=config.maximum_midi_note {
+            let frequency = 440.0 * 2.0_f32.powf((f32::from(midi_note) - 69.0) / 12.0);
+            weights[usize::from(midi_note % 12)] += 1.0 / frequency.sqrt();
+        }
+        let mut chroma = weights;
+
+        normalize_pitch_class_weights(&mut chroma, &weights);
+
+        assert!(chroma.iter().all(|value| (*value - 1.0).abs() < 1.0e-6));
     }
 
     #[test]
