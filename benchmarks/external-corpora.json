@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "corpora": {
+    "fmakv2-1000": {
+      "purpose": "External validation of global key detection",
+      "annotation_source": "https://zenodo.org/records/12759100",
+      "annotation_record": "10.5281/zenodo.12759100",
+      "annotation_license": "CC BY 4.0",
+      "audio_source": "https://github.com/mdeff/fma",
+      "audio_license": "Per-track Creative Commons licenses recorded by FMA",
+      "selection": "The 1,000 lowest SHA-256 ranks of namespace and track ID",
+      "limitations": [
+        "S-KEY training data is not fully disclosed, so pretraining overlap cannot be ruled out.",
+        "FMAKv2 has been used in published key-detection research.",
+        "This result must be described as external validation, not a clean held-out model comparison."
+      ]
+    },
+    "fsl10k-1000": {
+      "purpose": "External loop-domain validation of global tempo detection",
+      "source": "https://zenodo.org/records/3967852",
+      "record": "10.5281/zenodo.3967852",
+      "dataset_license": "CC BY 4.0",
+      "audio_license": "Per-sound Creative Commons licenses recorded in FSL10K metadata",
+      "selection": "Sounds with at least two usable annotations agreeing within 1 BPM, followed by the 1,000 lowest SHA-256 ranks of namespace and sound ID",
+      "limitations": [
+        "The corpus contains loops rather than complete songs.",
+        "The result measures steady-loop tempo and cannot establish full-song beat-tracking quality.",
+        "Potential pretraining overlap is not documented by the compared model authors."
+      ]
+    }
+  },
+  "rejected_corpora": {
+    "gtzan-rhythm": {
+      "reason": "Official audio is no longer distributed, and the audited annotation repository has no explicit license. An unofficial audio mirror would not meet the provenance gate."
+    }
+  }
+}
