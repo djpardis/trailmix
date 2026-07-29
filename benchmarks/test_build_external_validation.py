@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from build_external_validation import build_fmakv2, build_fsl10k
+from download_external_validation import member_name
 
 
 class ExternalValidationManifestTests(unittest.TestCase):
@@ -77,6 +78,19 @@ class ExternalValidationManifestTests(unittest.TestCase):
         self.assertEqual(len(manifest["tracks"]), 1)
         self.assertEqual(manifest["tracks"][0]["id"], "fsl10k-000042")
         self.assertEqual(manifest["tracks"][0]["expected_bpm"], 120.25)
+
+    def test_archive_members_are_resolved_from_source_ids(self) -> None:
+        fma_track = {"source": {"item_id": "1234"}}
+        fsl_track = {"source": {"item_id": "42"}}
+
+        self.assertEqual(
+            member_name("fmakv2", fma_track, {}),
+            "fma_large/001/001234.mp3",
+        )
+        self.assertEqual(
+            member_name("fsl10k", fsl_track, {"42": "audio/wav/42_user.wav.wav"}),
+            "audio/wav/42_user.wav.wav",
+        )
 
 
 if __name__ == "__main__":

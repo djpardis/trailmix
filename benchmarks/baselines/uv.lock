@@ -677,6 +677,18 @@ wheels = [
 ]
 
 [[package]]
+name = "remotezip"
+version = "0.12.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fa/8d/908ad46bff752568a409ee6ac797c3c6817501db06f142989e3208414569/remotezip-0.12.3.tar.gz", hash = "sha256:bf1ebe2be9f07a6e1c14d0e52ecffccd7a3e808dff4f9ba523c5e84d867a3fe3", size = 7835, upload-time = "2024-02-26T19:51:04.917Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/18/22316545b712dbed0119c7d3b8683a566c7da26353e344a4188b99f12692/remotezip-0.12.3-py3-none-any.whl", hash = "sha256:f70a4026879439ecb0a2cf848a7c176ae5ee142bbe51ec69e3344e150b2a52de", size = 8099, upload-time = "2024-02-26T19:51:02.968Z" },
+]
+
+[[package]]
 name = "requests"
 version = "2.34.2"
 source = { registry = "https://pypi.org/simple" }
@@ -994,6 +1006,8 @@ dependencies = [
     { name = "beat-this" },
     { name = "essentia" },
     { name = "librosa" },
+    { name = "remotezip" },
+    { name = "requests" },
     { name = "skey" },
 ]
 
@@ -1007,6 +1021,8 @@ requires-dist = [
     { name = "beat-this", specifier = "==1.1.0" },
     { name = "essentia", specifier = ">=2.1b6.dev1389" },
     { name = "librosa", specifier = ">=0.11.0" },
+    { name = "remotezip", specifier = ">=0.12.3" },
+    { name = "requests", specifier = ">=2.34.2" },
     { name = "skey", git = "https://github.com/deezer/s-key.git?rev=918b83d273568d5041569bb8068843d19a335726" },
 ]
 

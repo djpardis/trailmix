@@ -7,6 +7,8 @@ dependencies = [
     "beat-this==1.1.0",
     "essentia>=2.1b6.dev1389",
     "librosa>=0.11.0",
+    "remotezip>=0.12.3",
+    "requests>=2.34.2",
     "skey",
 ]
 
