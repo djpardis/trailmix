@@ -234,6 +234,46 @@ def consume_evaluation(
     return fingerprint
 
 
+def invalidate_evaluation(
+    manifest_path: Path,
+    reason: str,
+    ledger_path: Path,
+    receipt_path: Path,
+) -> str:
+    fingerprint = manifest_fingerprint(load_json(manifest_path))
+    invalidated_at = now()
+    with locked_ledger(ledger_path) as ledger:
+        existing = ledger["corpora"].get(fingerprint)
+        if existing is None:
+            raise PolicyError("corpus must be registered before it can be invalidated")
+        if existing["state"] not in {"sealed", "evaluated"}:
+            raise PolicyError(
+                f"only sealed or evaluated corpora can be invalidated, found {existing['state']}"
+            )
+        prior_state = existing["state"]
+        existing["state"] = "invalidated"
+        existing["invalidated_at"] = invalidated_at
+        existing["invalidation_reason"] = reason
+
+    receipt = {
+        "version": 1,
+        "corpus_sha256": fingerprint,
+        "prior_state": prior_state,
+        "invalidated_at": invalidated_at,
+        "reason": reason,
+    }
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with receipt_path.open("x") as stream:
+            json.dump(receipt, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+    except FileExistsError as error:
+        raise PolicyError(
+            f"invalidation receipt already exists: {receipt_path}"
+        ) from error
+    return fingerprint
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY)
@@ -253,6 +293,11 @@ def parse_arguments() -> argparse.Namespace:
     consume = subparsers.add_parser("consume")
     consume.add_argument("--manifest", type=Path, required=True)
     consume.add_argument("--configuration", type=Path, required=True)
+
+    invalidate = subparsers.add_parser("invalidate")
+    invalidate.add_argument("--manifest", type=Path, required=True)
+    invalidate.add_argument("--reason", required=True)
+    invalidate.add_argument("--receipt", type=Path, required=True)
 
     subparsers.add_parser("status")
     return parser.parse_args()
@@ -286,6 +331,14 @@ def main() -> None:
             arguments.ledger,
         )
         print(f"authorized evaluation corpus {fingerprint}")
+    elif arguments.command == "invalidate":
+        fingerprint = invalidate_evaluation(
+            arguments.manifest,
+            arguments.reason,
+            arguments.ledger,
+            arguments.receipt,
+        )
+        print(f"invalidated evaluation corpus {fingerprint}")
     elif arguments.command == "status":
         print(json.dumps(load_ledger(arguments.ledger), indent=2, sort_keys=True))
 

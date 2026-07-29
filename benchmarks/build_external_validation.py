@@ -49,7 +49,7 @@ def build_fmakv2(
                     },
                     "expected_key": f"{key} {mode.lower()}",
                     "annotation": {
-                        "status": "expert",
+                        "status": "reviewed",
                         "reviewer": "FMAKv2",
                         "notes": "Imported from the CC BY 4.0 FMAKv2 annotation release.",
                     },
@@ -94,7 +94,7 @@ def build_fsl10k(
                 },
                 "expected_bpm": statistics.median(bpms),
                 "annotation": {
-                    "status": "consensus",
+                    "status": "reviewed",
                     "reviewer": "FSL10K",
                     "notes": f"Median of {len(bpms)} annotations agreeing within 1 BPM.",
                 },

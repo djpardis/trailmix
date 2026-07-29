@@ -7,6 +7,7 @@ from pathlib import Path
 from corpus_policy import (
     PolicyError,
     consume_evaluation,
+    invalidate_evaluation,
     load_ledger,
     manifest_fingerprint,
     register_development,
@@ -143,6 +144,41 @@ class CorpusPolicyTests(unittest.TestCase):
         self.configuration.write_text('{"model": "changed"}\n')
 
         with self.assertRaisesRegex(PolicyError, "different configuration"):
+            consume_evaluation(
+                manifest,
+                self.configuration,
+                self.policy,
+                self.ledger,
+            )
+
+    def test_invalidated_corpus_cannot_be_consumed_again(self) -> None:
+        manifest = self.manifest("unseen-track")
+        seal_evaluation(
+            manifest,
+            "Unseen set",
+            self.configuration,
+            self.policy,
+            self.ledger,
+        )
+        consume_evaluation(
+            manifest,
+            self.configuration,
+            self.policy,
+            self.ledger,
+        )
+        receipt = self.directory / "invalidation.json"
+        fingerprint = invalidate_evaluation(
+            manifest,
+            "Invalid manifest metadata.",
+            self.ledger,
+            receipt,
+        )
+
+        self.assertEqual(
+            json.loads(receipt.read_text())["corpus_sha256"],
+            fingerprint,
+        )
+        with self.assertRaisesRegex(PolicyError, "state must be sealed"):
             consume_evaluation(
                 manifest,
                 self.configuration,

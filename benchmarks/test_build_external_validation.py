@@ -47,6 +47,7 @@ class ExternalValidationManifestTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(len(first["tracks"]), 1)
         self.assertTrue(first["tracks"][0]["path"].endswith(".mp3"))
+        self.assertEqual(first["tracks"][0]["annotation"]["status"], "reviewed")
 
     def test_fsl10k_requires_two_close_usable_annotations(self) -> None:
         annotations = self.directory / "annotations"
@@ -78,6 +79,7 @@ class ExternalValidationManifestTests(unittest.TestCase):
         self.assertEqual(len(manifest["tracks"]), 1)
         self.assertEqual(manifest["tracks"][0]["id"], "fsl10k-000042")
         self.assertEqual(manifest["tracks"][0]["expected_bpm"], 120.25)
+        self.assertEqual(manifest["tracks"][0]["annotation"]["status"], "reviewed")
 
     def test_archive_members_are_resolved_from_source_ids(self) -> None:
         fma_track = {"source": {"item_id": "1234"}}
