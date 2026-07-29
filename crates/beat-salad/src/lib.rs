@@ -175,8 +175,13 @@ fn estimate_tempo(
         .fold(0.0_f32, f32::max)
         .max(f32::EPSILON);
 
-    let mut candidates = Vec::with_capacity(max_lag - min_lag + 1);
-    for lag in min_lag..=max_lag {
+    let mut base_scores = vec![0.0; max_lag + 1];
+    for (lag, base_score) in base_scores
+        .iter_mut()
+        .enumerate()
+        .take(max_lag + 1)
+        .skip(min_lag)
+    {
         let neighborhood_start = lag.saturating_sub(1).max(1);
         let neighborhood_end = (lag + 1).min(max_lag);
         let interval_score = interval_histogram[neighborhood_start..=neighborhood_end]
@@ -187,9 +192,22 @@ fn estimate_tempo(
             .iter()
             .copied()
             .fold(0.0_f32, f32::max);
+        *base_score = 0.65 * interval_score + 0.35 * periodicity;
+    }
+
+    let mut candidates = Vec::with_capacity(max_lag - min_lag + 1);
+    for lag in min_lag..=max_lag {
+        let mut family_score = base_scores[lag];
+        for (multiple, weight) in [(2, 0.35), (3, 0.15)] {
+            if let Some(family_lag) = lag.checked_mul(multiple)
+                && family_lag <= max_lag
+            {
+                family_score += base_scores[family_lag] * weight;
+            }
+        }
         let bpm = 60.0 * envelope_rate / lag as f32;
         let octave_prior = (-(bpm / 120.0).log2().powi(2) / 2.0).exp();
-        let score = (0.65 * interval_score + 0.35 * periodicity) * (0.8 + 0.2 * octave_prior);
+        let score = family_score * (0.9 + 0.1 * octave_prior);
         candidates.push((lag, score));
     }
 
@@ -418,6 +436,16 @@ mod tests {
         samples
     }
 
+    fn mixed_period_onset(length: usize, periods: &[(usize, f32)]) -> Vec<f32> {
+        let mut onset = vec![0.0; length];
+        for &(period, strength) in periods {
+            for position in (0..length).step_by(period) {
+                onset[position] += strength;
+            }
+        }
+        onset
+    }
+
     #[test]
     fn detects_a_120_bpm_click_track() {
         let samples = click_track(120.0, 20.0, 44_100);
@@ -441,6 +469,19 @@ mod tests {
         let bpm = result.global_bpm.expect("tempo");
 
         assert!((config.min_bpm..=config.max_bpm).contains(&bpm));
+    }
+
+    #[test]
+    fn prefers_the_base_pulse_over_a_two_thirds_alias() {
+        let envelope_rate = 44_100.0 / 512.0;
+        let onset = mixed_period_onset(2_000, &[(30, 0.65), (45, 1.0)]);
+        let estimate = estimate_tempo(&onset, envelope_rate, 60.0, 200.0).expect("tempo");
+
+        assert!(
+            (estimate.bpm - 172.27).abs() < 3.0,
+            "detected {}",
+            estimate.bpm
+        );
     }
 
     #[test]
