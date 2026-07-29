@@ -7,11 +7,19 @@ use trailmix_manifest::{KeySegmentAnnotation, TempoSegmentAnnotation, TrackAnnot
 const SAMPLE_RATE: u32 = 44_100;
 const DURATION_SECONDS: u32 = 20;
 
+/// Discarded, unmeasured calls that let allocators and caches settle before timing starts.
+const WARMUP_RUNS: usize = 1;
+/// Measured calls per track. Reporting the median of several runs, rather than one
+/// untuned call, keeps a single slow scheduling tick from skewing the result.
+const TIMED_RUNS: usize = 5;
+
 #[derive(Serialize)]
 struct SyntheticBenchmark {
     version: u32,
     sample_rate: u32,
     duration_seconds: u32,
+    warmup_runs: usize,
+    timed_runs: usize,
     cases: Vec<SyntheticCase>,
 }
 
@@ -21,7 +29,7 @@ struct SyntheticCase {
     detected_bpm: Option<f32>,
     absolute_error: Option<f32>,
     confidence: f32,
-    elapsed_milliseconds: f64,
+    median_elapsed_milliseconds: f64,
 }
 
 #[derive(Serialize)]
@@ -29,6 +37,8 @@ struct CorpusBenchmark {
     version: u32,
     manifest_version: u32,
     track_count: usize,
+    warmup_runs: usize,
+    timed_runs: usize,
     summary: CorpusSummary,
     tracks: Vec<TrackResult>,
 }
@@ -44,6 +54,9 @@ struct CorpusSummary {
     key_segment_exact_accuracy: Option<f32>,
     mean_decode_milliseconds: Option<f64>,
     mean_analysis_milliseconds: Option<f64>,
+    mean_beat_analysis_milliseconds: Option<f64>,
+    mean_key_analysis_milliseconds: Option<f64>,
+    mean_waveform_analysis_milliseconds: Option<f64>,
 }
 
 #[derive(Serialize)]
@@ -52,7 +65,13 @@ struct TrackResult {
     split: Option<String>,
     duration_seconds: Option<f64>,
     decode_milliseconds: Option<f64>,
+    /// Median of `TIMED_RUNS` calls, after `WARMUP_RUNS` discarded calls. Sum of the
+    /// three per-analyzer medians below, so it is comparable across tracks even
+    /// though the three analyzers run one after another inside `analyze()`.
     analysis_milliseconds: Option<f64>,
+    beat_analysis_milliseconds: Option<f64>,
+    key_analysis_milliseconds: Option<f64>,
+    waveform_analysis_milliseconds: Option<f64>,
     expected_bpm: Option<f32>,
     detected_bpm: Option<f32>,
     bpm_absolute_error: Option<f32>,
@@ -101,21 +120,32 @@ fn run_synthetic() -> SyntheticBenchmark {
         version: 1,
         sample_rate: SAMPLE_RATE,
         duration_seconds: DURATION_SECONDS,
+        warmup_runs: WARMUP_RUNS,
+        timed_runs: TIMED_RUNS,
         cases,
     }
 }
 
 fn run_case(expected_bpm: f32) -> SyntheticCase {
     let samples = synthetic_track(expected_bpm);
-    let started = Instant::now();
-    let analysis = trailmix::analyze(
-        AudioBuffer {
-            samples: &samples,
-            sample_rate: SAMPLE_RATE,
-        },
-        AnalysisConfig::default(),
-    );
-    let elapsed_milliseconds = started.elapsed().as_secs_f64() * 1_000.0;
+    let config = AnalysisConfig::default();
+    let audio = AudioBuffer {
+        samples: &samples,
+        sample_rate: SAMPLE_RATE,
+    };
+
+    for _ in 0..WARMUP_RUNS {
+        let _ = trailmix::analyze(audio, config);
+    }
+    let mut timings = Vec::with_capacity(TIMED_RUNS);
+    let mut analysis = None;
+    for _ in 0..TIMED_RUNS {
+        let started = Instant::now();
+        let result = trailmix::analyze(audio, config);
+        timings.push(started.elapsed().as_secs_f64() * 1_000.0);
+        analysis = Some(result);
+    }
+    let analysis = analysis.expect("TIMED_RUNS is at least one");
 
     SyntheticCase {
         expected_bpm,
@@ -125,7 +155,7 @@ fn run_case(expected_bpm: f32) -> SyntheticCase {
             .global_bpm
             .map(|detected| (detected - expected_bpm).abs()),
         confidence: analysis.beat.confidence,
-        elapsed_milliseconds,
+        median_elapsed_milliseconds: median_f64(&timings).unwrap_or(0.0),
     }
 }
 
@@ -168,12 +198,56 @@ fn run_manifest(path: &Path) -> Result<CorpusBenchmark, Box<dyn Error>> {
     let summary = summarize(&tracks);
 
     Ok(CorpusBenchmark {
-        version: 1,
+        version: 2,
         manifest_version: manifest.version,
         track_count: tracks.len(),
+        warmup_runs: WARMUP_RUNS,
+        timed_runs: TIMED_RUNS,
         summary,
         tracks,
     })
+}
+
+/// Timed, repeated measurements of the three analyzers called by
+/// `trailmix::analyze`. Timing each analyzer separately turns one opaque total into a
+/// breakdown that can be attributed to a component. The analyzers are pure functions
+/// of their input samples, so repeating a run changes only the timings.
+struct AnalysisTimings {
+    beat: f64,
+    key: f64,
+    waveform: f64,
+}
+
+fn measure_analyzers(samples: &[f32], sample_rate: u32, config: AnalysisConfig) -> AnalysisTimings {
+    for _ in 0..WARMUP_RUNS {
+        let _ = beat_salad::analyze(samples, sample_rate, config.beat);
+        let _ = key_lime::analyze(samples, sample_rate, config.key);
+        let _ = sampler_platter::generate_overview(samples, sample_rate, config.waveform_columns);
+    }
+
+    let mut beat_timings = Vec::with_capacity(TIMED_RUNS);
+    let mut key_timings = Vec::with_capacity(TIMED_RUNS);
+    let mut waveform_timings = Vec::with_capacity(TIMED_RUNS);
+
+    for _ in 0..TIMED_RUNS {
+        let beat_started = Instant::now();
+        let _ = beat_salad::analyze(samples, sample_rate, config.beat);
+        beat_timings.push(beat_started.elapsed().as_secs_f64() * 1_000.0);
+
+        let key_started = Instant::now();
+        let _ = key_lime::analyze(samples, sample_rate, config.key);
+        key_timings.push(key_started.elapsed().as_secs_f64() * 1_000.0);
+
+        let waveform_started = Instant::now();
+        let _ = sampler_platter::generate_overview(samples, sample_rate, config.waveform_columns);
+        waveform_timings.push(waveform_started.elapsed().as_secs_f64() * 1_000.0);
+    }
+
+    AnalysisTimings {
+        beat: median_f64(&beat_timings).unwrap_or(0.0),
+        key: median_f64(&key_timings).unwrap_or(0.0),
+        waveform: median_f64(&waveform_timings).unwrap_or(0.0),
+    }
 }
 
 fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> TrackResult {
@@ -188,15 +262,16 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         Err(error) => return failed_track(track, error.to_string()),
     };
     let decode_milliseconds = decode_started.elapsed().as_secs_f64() * 1_000.0;
-    let analysis_started = Instant::now();
+    let config = AnalysisConfig::default();
+    let timings = measure_analyzers(&decoded.samples, decoded.sample_rate, config);
     let analysis = trailmix::analyze(
         AudioBuffer {
             samples: &decoded.samples,
             sample_rate: decoded.sample_rate,
         },
-        AnalysisConfig::default(),
+        config,
     );
-    let analysis_milliseconds = analysis_started.elapsed().as_secs_f64() * 1_000.0;
+    let analysis_milliseconds = timings.beat + timings.key + timings.waveform;
 
     let expected_key = match track.expected_key.as_deref().map(parse_key).transpose() {
         Ok(key) => key,
@@ -219,6 +294,9 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         duration_seconds: Some(decoded.duration_seconds()),
         decode_milliseconds: Some(decode_milliseconds),
         analysis_milliseconds: Some(analysis_milliseconds),
+        beat_analysis_milliseconds: Some(timings.beat),
+        key_analysis_milliseconds: Some(timings.key),
+        waveform_analysis_milliseconds: Some(timings.waveform),
         expected_bpm: track.expected_bpm,
         detected_bpm: analysis.beat.global_bpm,
         bpm_absolute_error,
@@ -242,6 +320,9 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         duration_seconds: None,
         decode_milliseconds: None,
         analysis_milliseconds: None,
+        beat_analysis_milliseconds: None,
+        key_analysis_milliseconds: None,
+        waveform_analysis_milliseconds: None,
         expected_bpm: track.expected_bpm,
         detected_bpm: None,
         bpm_absolute_error: None,
@@ -347,6 +428,18 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
         .iter()
         .filter_map(|track| track.analysis_milliseconds)
         .collect::<Vec<_>>();
+    let beat_times = tracks
+        .iter()
+        .filter_map(|track| track.beat_analysis_milliseconds)
+        .collect::<Vec<_>>();
+    let key_times = tracks
+        .iter()
+        .filter_map(|track| track.key_analysis_milliseconds)
+        .collect::<Vec<_>>();
+    let waveform_times = tracks
+        .iter()
+        .filter_map(|track| track.waveform_analysis_milliseconds)
+        .collect::<Vec<_>>();
 
     CorpusSummary {
         analyzed_tracks: tracks.iter().filter(|track| track.error.is_none()).count(),
@@ -363,6 +456,9 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
         key_segment_exact_accuracy: mean_f32(&key_segment_accuracies),
         mean_decode_milliseconds: mean_f64(&decode_times),
         mean_analysis_milliseconds: mean_f64(&analysis_times),
+        mean_beat_analysis_milliseconds: mean_f64(&beat_times),
+        mean_key_analysis_milliseconds: mean_f64(&key_times),
+        mean_waveform_analysis_milliseconds: mean_f64(&waveform_times),
     }
 }
 
@@ -372,6 +468,22 @@ fn mean_f32(values: &[f32]) -> Option<f32> {
 
 fn mean_f64(values: &[f64]) -> Option<f64> {
     (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
+}
+
+/// Median of timed-run milliseconds. This limits the effect of an occasional slow
+/// run caused by OS scheduling.
+fn median_f64(values: &[f64]) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let midpoint = sorted.len() / 2;
+    Some(if sorted.len() % 2 == 0 {
+        f64::midpoint(sorted[midpoint - 1], sorted[midpoint])
+    } else {
+        sorted[midpoint]
+    })
 }
 
 fn parse_key(value: &str) -> Result<MusicalKey, String> {

@@ -767,7 +767,10 @@ dependencies = [
 name = "trailmix-bench"
 version = "0.1.0"
 dependencies = [
+ "beat-salad",
  "hound",
+ "key-lime",
+ "sampler-platter",
  "serde",
  "serde_json",
  "trailmix",
