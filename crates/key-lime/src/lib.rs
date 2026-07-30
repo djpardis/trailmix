@@ -162,6 +162,9 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
         return empty_analysis();
     }
 
+    let window = hanning_window(config.frame_size);
+    let goertzel_table = GoertzelTable::new(sample_rate, config);
+    let mut windowed_frame = vec![0.0_f32; config.frame_size];
     let mut chroma = [0.0_f32; 12];
     let mut frame_chromas = Vec::new();
     let mut start = 0;
@@ -175,8 +178,9 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
             / config.frame_size as f32;
 
         if frame_energy > 1.0e-8 {
+            apply_window(frame, &window, &mut windowed_frame);
             let mut frame_chroma = [0.0; 12];
-            accumulate_chroma(frame, sample_rate, config, &mut frame_chroma);
+            accumulate_chroma_windowed(&windowed_frame, &goertzel_table, &mut frame_chroma);
             normalize_chroma(&mut frame_chroma);
             for (total, value) in chroma.iter_mut().zip(frame_chroma) {
                 *total += value;
@@ -377,23 +381,86 @@ fn estimate_segments(
         .collect()
 }
 
-fn accumulate_chroma(frame: &[f32], sample_rate: u32, config: KeyConfig, chroma: &mut [f32; 12]) {
-    let nyquist_guard = sample_rate as f32 * 0.45;
-    let mut pitch_class_weights = [0.0; 12];
-    for midi_note in config.minimum_midi_note..=config.maximum_midi_note {
-        let frequency = 440.0 * 2.0_f32.powf((f32::from(midi_note) - 69.0) / 12.0);
-        if frequency >= nyquist_guard {
-            break;
-        }
+fn hanning_window(size: usize) -> Vec<f32> {
+    let denominator = (size.saturating_sub(1)).max(1) as f32;
+    (0..size)
+        .map(|index| 0.5 - 0.5 * (2.0 * std::f32::consts::PI * index as f32 / denominator).cos())
+        .collect()
+}
 
-        let magnitude = goertzel_power(frame, sample_rate, frequency);
-        let pitch_class = usize::from(midi_note % 12);
-        let weight = 1.0 / frequency.sqrt();
-        chroma[pitch_class] += magnitude.sqrt() * weight;
-        pitch_class_weights[pitch_class] += weight;
+fn apply_window(frame: &[f32], window: &[f32], output: &mut [f32]) {
+    for ((out, sample), w) in output.iter_mut().zip(frame.iter()).zip(window.iter()) {
+        *out = if sample.is_finite() { *sample * w } else { 0.0 };
     }
+}
 
-    normalize_pitch_class_weights(chroma, &pitch_class_weights);
+struct GoertzelNote {
+    coefficient: f32,
+    pitch_class: usize,
+    weight: f32,
+}
+
+struct GoertzelTable {
+    notes: Vec<GoertzelNote>,
+    pitch_class_weights: [f32; 12],
+}
+
+impl GoertzelTable {
+    fn new(sample_rate: u32, config: KeyConfig) -> Self {
+        let nyquist_guard = sample_rate as f32 * 0.45;
+        let mut notes = Vec::new();
+        let mut pitch_class_weights = [0.0_f32; 12];
+        for midi_note in config.minimum_midi_note..=config.maximum_midi_note {
+            let frequency = 440.0 * 2.0_f32.powf((f32::from(midi_note) - 69.0) / 12.0);
+            if frequency >= nyquist_guard {
+                break;
+            }
+            let omega = 2.0 * std::f32::consts::PI * frequency / sample_rate as f32;
+            let pitch_class = usize::from(midi_note % 12);
+            let weight = 1.0 / frequency.sqrt();
+            pitch_class_weights[pitch_class] += weight;
+            notes.push(GoertzelNote {
+                coefficient: 2.0 * omega.cos(),
+                pitch_class,
+                weight,
+            });
+        }
+        Self {
+            notes,
+            pitch_class_weights,
+        }
+    }
+}
+
+fn accumulate_chroma_windowed(
+    windowed_frame: &[f32],
+    table: &GoertzelTable,
+    chroma: &mut [f32; 12],
+) {
+    let notes = &table.notes;
+    let chunks = notes.chunks_exact(4);
+    let remainder = chunks.remainder();
+
+    for chunk in chunks {
+        let powers = goertzel_power_batch_4(
+            windowed_frame,
+            [
+                chunk[0].coefficient,
+                chunk[1].coefficient,
+                chunk[2].coefficient,
+                chunk[3].coefficient,
+            ],
+        );
+        chroma[chunk[0].pitch_class] += powers[0].sqrt() * chunk[0].weight;
+        chroma[chunk[1].pitch_class] += powers[1].sqrt() * chunk[1].weight;
+        chroma[chunk[2].pitch_class] += powers[2].sqrt() * chunk[2].weight;
+        chroma[chunk[3].pitch_class] += powers[3].sqrt() * chunk[3].weight;
+    }
+    for note in remainder {
+        let magnitude = goertzel_power_prewindowed(windowed_frame, note.coefficient);
+        chroma[note.pitch_class] += magnitude.sqrt() * note.weight;
+    }
+    normalize_pitch_class_weights(chroma, &table.pitch_class_weights);
 }
 
 fn normalize_pitch_class_weights(chroma: &mut [f32; 12], weights: &[f32; 12]) {
@@ -404,21 +471,33 @@ fn normalize_pitch_class_weights(chroma: &mut [f32; 12], weights: &[f32; 12]) {
     }
 }
 
-fn goertzel_power(samples: &[f32], sample_rate: u32, frequency: f32) -> f32 {
-    let omega = 2.0 * std::f32::consts::PI * frequency / sample_rate as f32;
-    let coefficient = 2.0 * omega.cos();
-    let denominator = (samples.len().saturating_sub(1)).max(1) as f32;
-    let mut previous = 0.0;
-    let mut previous_previous = 0.0;
+fn goertzel_power_batch_4(samples: &[f32], coefficients: [f32; 4]) -> [f32; 4] {
+    let mut prev = [0.0_f32; 4];
+    let mut prev_prev = [0.0_f32; 4];
 
-    for (index, raw_sample) in samples.iter().enumerate() {
-        let sample = if raw_sample.is_finite() {
-            *raw_sample
-        } else {
-            0.0
-        };
-        let window = 0.5 - 0.5 * (2.0 * std::f32::consts::PI * index as f32 / denominator).cos();
-        let current = sample * window + coefficient * previous - previous_previous;
+    for &sample in samples {
+        for i in 0..4 {
+            let current = sample + coefficients[i] * prev[i] - prev_prev[i];
+            prev_prev[i] = prev[i];
+            prev[i] = current;
+        }
+    }
+
+    let mut powers = [0.0_f32; 4];
+    for i in 0..4 {
+        powers[i] = (prev_prev[i] * prev_prev[i] + prev[i] * prev[i]
+            - coefficients[i] * prev[i] * prev_prev[i])
+            .max(0.0);
+    }
+    powers
+}
+
+fn goertzel_power_prewindowed(samples: &[f32], coefficient: f32) -> f32 {
+    let mut previous = 0.0_f32;
+    let mut previous_previous = 0.0_f32;
+
+    for &sample in samples {
+        let current = sample + coefficient * previous - previous_previous;
         previous_previous = previous;
         previous = current;
     }
