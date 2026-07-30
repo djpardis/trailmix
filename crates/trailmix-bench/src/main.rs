@@ -1,8 +1,10 @@
 use std::{env, error::Error, path::Path, process::ExitCode, time::Instant};
 
 use serde::Serialize;
-use trailmix::{Analysis, AnalysisConfig, AudioBuffer, Mode, MusicalKey, PitchClass};
-use trailmix_manifest::{KeySegmentAnnotation, TempoSegmentAnnotation, TrackAnnotation};
+use trailmix::{Analysis, AnalysisConfig, AudioBuffer, BeatPosition, Mode, MusicalKey, PitchClass};
+use trailmix_manifest::{
+    BeatAnnotation, KeySegmentAnnotation, TempoSegmentAnnotation, TrackAnnotation,
+};
 
 const SAMPLE_RATE: u32 = 44_100;
 const DURATION_SECONDS: u32 = 20;
@@ -52,6 +54,11 @@ struct CorpusSummary {
     exact_key_accuracy: Option<f32>,
     tempo_segment_mean_absolute_error: Option<f32>,
     key_segment_exact_accuracy: Option<f32>,
+    beat_f1: Option<f32>,
+    beat_precision: Option<f32>,
+    beat_recall: Option<f32>,
+    multi_tempo_tracks: usize,
+    multi_key_tracks: usize,
     mean_decode_milliseconds: Option<f64>,
     mean_analysis_milliseconds: Option<f64>,
     mean_beat_analysis_milliseconds: Option<f64>,
@@ -81,6 +88,15 @@ struct TrackResult {
     exact_key_match: Option<bool>,
     tempo_segment_mean_absolute_error: Option<f32>,
     key_segment_exact_accuracy: Option<f32>,
+    beat_f1: Option<f32>,
+    beat_precision: Option<f32>,
+    beat_recall: Option<f32>,
+    multi_tempo: bool,
+    alternate_bpm: Option<f32>,
+    alternate_bpm_coverage: f32,
+    multi_key: bool,
+    alternate_key: Option<String>,
+    alternate_key_coverage: f32,
     error: Option<String>,
 }
 
@@ -287,6 +303,7 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
             Ok(accuracy) => accuracy,
             Err(error) => return failed_track(track, error),
         };
+    let beat_scores = beat_position_f1(&track.expected_beats, &analysis.beat.beats, 0.070);
 
     TrackResult {
         id: track.id.clone(),
@@ -309,6 +326,15 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
             &analysis,
         ),
         key_segment_exact_accuracy,
+        beat_f1: beat_scores.map(|scores| scores.f1),
+        beat_precision: beat_scores.map(|scores| scores.precision),
+        beat_recall: beat_scores.map(|scores| scores.recall),
+        multi_tempo: analysis.beat.multi_tempo,
+        alternate_bpm: analysis.beat.alternate_bpm,
+        alternate_bpm_coverage: analysis.beat.alternate_coverage,
+        multi_key: analysis.key.multi_key,
+        alternate_key: analysis.key.alternate_key.map(|key| key.to_string()),
+        alternate_key_coverage: analysis.key.alternate_coverage,
         error: None,
     }
 }
@@ -332,6 +358,15 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         exact_key_match: None,
         tempo_segment_mean_absolute_error: None,
         key_segment_exact_accuracy: None,
+        beat_f1: None,
+        beat_precision: None,
+        beat_recall: None,
+        multi_tempo: false,
+        alternate_bpm: None,
+        alternate_bpm_coverage: 0.0,
+        multi_key: false,
+        alternate_key: None,
+        alternate_key_coverage: 0.0,
         error: Some(error),
     }
 }
@@ -399,6 +434,67 @@ fn key_segment_accuracy(
     ))
 }
 
+#[derive(Clone, Copy)]
+struct BeatF1Scores {
+    precision: f32,
+    recall: f32,
+    f1: f32,
+}
+
+/// Beat-position F1 with a tolerance window (seconds). Each reference beat is matched
+/// to at most one detected beat (nearest within tolerance), and vice versa.
+fn beat_position_f1(
+    expected: &[BeatAnnotation],
+    detected: &[BeatPosition],
+    tolerance_seconds: f64,
+) -> Option<BeatF1Scores> {
+    if expected.is_empty() {
+        return None;
+    }
+    if detected.is_empty() {
+        return Some(BeatF1Scores {
+            precision: 0.0,
+            recall: 0.0,
+            f1: 0.0,
+        });
+    }
+
+    let mut detected_matched = vec![false; detected.len()];
+    let mut true_positives = 0u32;
+
+    for reference in expected {
+        let mut best_index = None;
+        let mut best_distance = f64::INFINITY;
+        for (index, beat) in detected.iter().enumerate() {
+            if detected_matched[index] {
+                continue;
+            }
+            let distance = (beat.time_seconds - reference.time_seconds).abs();
+            if distance <= tolerance_seconds && distance < best_distance {
+                best_distance = distance;
+                best_index = Some(index);
+            }
+        }
+        if let Some(index) = best_index {
+            detected_matched[index] = true;
+            true_positives += 1;
+        }
+    }
+
+    let precision = true_positives as f32 / detected.len() as f32;
+    let recall = true_positives as f32 / expected.len() as f32;
+    let f1 = if precision + recall > 0.0 {
+        2.0 * precision * recall / (precision + recall)
+    } else {
+        0.0
+    };
+    Some(BeatF1Scores {
+        precision,
+        recall,
+        f1,
+    })
+}
+
 fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
     let bpm_errors = tracks
         .iter()
@@ -441,6 +537,19 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
         .filter_map(|track| track.waveform_analysis_milliseconds)
         .collect::<Vec<_>>();
 
+    let beat_f1_values = tracks
+        .iter()
+        .filter_map(|track| track.beat_f1)
+        .collect::<Vec<_>>();
+    let beat_precision_values = tracks
+        .iter()
+        .filter_map(|track| track.beat_precision)
+        .collect::<Vec<_>>();
+    let beat_recall_values = tracks
+        .iter()
+        .filter_map(|track| track.beat_recall)
+        .collect::<Vec<_>>();
+
     CorpusSummary {
         analyzed_tracks: tracks.iter().filter(|track| track.error.is_none()).count(),
         failed_tracks: tracks.iter().filter(|track| track.error.is_some()).count(),
@@ -454,6 +563,11 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
         ),
         tempo_segment_mean_absolute_error: mean_f32(&segment_errors),
         key_segment_exact_accuracy: mean_f32(&key_segment_accuracies),
+        beat_f1: mean_f32(&beat_f1_values),
+        beat_precision: mean_f32(&beat_precision_values),
+        beat_recall: mean_f32(&beat_recall_values),
+        multi_tempo_tracks: tracks.iter().filter(|track| track.multi_tempo).count(),
+        multi_key_tracks: tracks.iter().filter(|track| track.multi_key).count(),
         mean_decode_milliseconds: mean_f64(&decode_times),
         mean_analysis_milliseconds: mean_f64(&analysis_times),
         mean_beat_analysis_milliseconds: mean_f64(&beat_times),
