@@ -596,6 +596,111 @@ mod tests {
     }
 
     #[test]
+    fn alternate_key_disabled_when_threshold_zero() {
+        let sample_rate = 8_000;
+        let mut samples = chord(&[220.0, 277.18, 329.63], 8.0, sample_rate);
+        samples.extend(chord(&[261.63, 311.13, 392.0], 8.0, sample_rate));
+
+        let result = analyze(
+            &samples,
+            sample_rate,
+            KeyConfig {
+                frame_size: 2_048,
+                hop_size: 1_024,
+                local_window_seconds: 4.0,
+                local_hop_seconds: 2.0,
+                alternate_coverage_threshold: 0.0,
+                ..KeyConfig::default()
+            },
+        );
+        assert!(!result.multi_key);
+        assert_eq!(result.alternate_key, None);
+    }
+
+    #[test]
+    fn significant_alternate_key_empty_segments() {
+        let primary = MusicalKey {
+            tonic: PitchClass::A,
+            mode: Mode::Major,
+        };
+        assert_eq!(significant_alternate_key(&[], primary, 0.25), None);
+    }
+
+    #[test]
+    fn significant_alternate_key_single_matching_segment() {
+        let primary = MusicalKey {
+            tonic: PitchClass::A,
+            mode: Mode::Major,
+        };
+        let segments = vec![KeySegment {
+            start_seconds: 0.0,
+            end_seconds: 30.0,
+            key: primary,
+            confidence: 0.8,
+        }];
+        assert_eq!(significant_alternate_key(&segments, primary, 0.25), None);
+    }
+
+    #[test]
+    fn significant_alternate_key_below_threshold() {
+        let primary = MusicalKey {
+            tonic: PitchClass::A,
+            mode: Mode::Major,
+        };
+        let alternate = MusicalKey {
+            tonic: PitchClass::C,
+            mode: Mode::Minor,
+        };
+        let segments = vec![
+            KeySegment {
+                start_seconds: 0.0,
+                end_seconds: 40.0,
+                key: primary,
+                confidence: 0.8,
+            },
+            KeySegment {
+                start_seconds: 40.0,
+                end_seconds: 48.0,
+                key: alternate,
+                confidence: 0.6,
+            },
+        ];
+        // 8/48 = 16.7%, below 25%
+        assert_eq!(significant_alternate_key(&segments, primary, 0.25), None);
+    }
+
+    #[test]
+    fn significant_alternate_key_above_threshold() {
+        let primary = MusicalKey {
+            tonic: PitchClass::A,
+            mode: Mode::Major,
+        };
+        let alternate = MusicalKey {
+            tonic: PitchClass::C,
+            mode: Mode::Minor,
+        };
+        let segments = vec![
+            KeySegment {
+                start_seconds: 0.0,
+                end_seconds: 24.0,
+                key: primary,
+                confidence: 0.8,
+            },
+            KeySegment {
+                start_seconds: 24.0,
+                end_seconds: 48.0,
+                key: alternate,
+                confidence: 0.7,
+            },
+        ];
+        let result = significant_alternate_key(&segments, primary, 0.25);
+        assert!(result.is_some());
+        let (key, coverage) = result.unwrap();
+        assert_eq!(key, alternate);
+        assert!((coverage - 0.5).abs() < 0.01);
+    }
+
+    #[test]
     fn rejects_silence() {
         let result = analyze(&vec![0.0; 44_100], 44_100, KeyConfig::default());
         assert_eq!(result.key, None);

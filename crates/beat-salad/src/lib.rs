@@ -609,6 +609,94 @@ mod tests {
     }
 
     #[test]
+    fn single_tempo_track_has_no_alternate() {
+        let samples = click_track(120.0, 20.0, 44_100);
+        let result = analyze(&samples, 44_100, BeatConfig::default());
+        assert!(result.global_bpm.is_some());
+        assert!(!result.multi_tempo);
+        assert_eq!(result.alternate_bpm, None);
+        assert_eq!(result.alternate_coverage, 0.0);
+    }
+
+    #[test]
+    fn alternate_disabled_when_threshold_zero() {
+        let mut samples = click_track(120.0, 24.0, 44_100);
+        samples.extend(click_track(90.0, 24.0, 44_100));
+        let config = BeatConfig {
+            alternate_coverage_threshold: 0.0,
+            ..BeatConfig::default()
+        };
+        let result = analyze(&samples, 44_100, config);
+        assert!(!result.multi_tempo);
+        assert_eq!(result.alternate_bpm, None);
+    }
+
+    #[test]
+    fn significant_alternate_tempo_empty_segments() {
+        assert_eq!(significant_alternate_tempo(&[], 120.0, 0.04, 0.25), None);
+    }
+
+    #[test]
+    fn significant_alternate_tempo_single_matching_segment() {
+        let segments = vec![TempoSegment {
+            start_seconds: 0.0,
+            end_seconds: 30.0,
+            bpm: 120.0,
+            confidence: 0.8,
+        }];
+        assert_eq!(
+            significant_alternate_tempo(&segments, 120.0, 0.04, 0.25),
+            None
+        );
+    }
+
+    #[test]
+    fn significant_alternate_tempo_below_threshold() {
+        let segments = vec![
+            TempoSegment {
+                start_seconds: 0.0,
+                end_seconds: 40.0,
+                bpm: 120.0,
+                confidence: 0.8,
+            },
+            TempoSegment {
+                start_seconds: 40.0,
+                end_seconds: 48.0,
+                bpm: 90.0,
+                confidence: 0.7,
+            },
+        ];
+        // 8/48 = 16.7%, below 25% threshold
+        assert_eq!(
+            significant_alternate_tempo(&segments, 120.0, 0.04, 0.25),
+            None
+        );
+    }
+
+    #[test]
+    fn significant_alternate_tempo_above_threshold() {
+        let segments = vec![
+            TempoSegment {
+                start_seconds: 0.0,
+                end_seconds: 24.0,
+                bpm: 120.0,
+                confidence: 0.8,
+            },
+            TempoSegment {
+                start_seconds: 24.0,
+                end_seconds: 48.0,
+                bpm: 90.0,
+                confidence: 0.7,
+            },
+        ];
+        let result = significant_alternate_tempo(&segments, 120.0, 0.04, 0.25);
+        assert!(result.is_some());
+        let (bpm, coverage) = result.unwrap();
+        assert!((bpm - 90.0).abs() < 1.0);
+        assert!((coverage - 0.5).abs() < 0.01);
+    }
+
+    #[test]
     fn rejects_silence() {
         let result = analyze(&vec![0.0; 44_100 * 5], 44_100, BeatConfig::default());
         assert_eq!(result.global_bpm, None);
