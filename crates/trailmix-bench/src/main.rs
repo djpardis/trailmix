@@ -3,7 +3,8 @@ use std::{env, error::Error, path::Path, process::ExitCode, time::Instant};
 use serde::Serialize;
 use trailmix::{Analysis, AnalysisConfig, AudioBuffer, BeatPosition, Mode, MusicalKey, PitchClass};
 use trailmix_manifest::{
-    BeatAnnotation, KeySegmentAnnotation, TempoSegmentAnnotation, TrackAnnotation,
+    BeatAnnotation, KeySegmentAnnotation, SeratoObservation, TempoSegmentAnnotation,
+    TrackAnnotation,
 };
 
 const SAMPLE_RATE: u32 = 44_100;
@@ -59,6 +60,9 @@ struct CorpusSummary {
     beat_recall: Option<f32>,
     multi_tempo_tracks: usize,
     multi_key_tracks: usize,
+    serato_bpm_mean_absolute_agreement: Option<f32>,
+    serato_bpm_octave_aware_mean_absolute_agreement: Option<f32>,
+    serato_exact_key_agreement: Option<f32>,
     mean_decode_milliseconds: Option<f64>,
     mean_analysis_milliseconds: Option<f64>,
     mean_beat_analysis_milliseconds: Option<f64>,
@@ -97,6 +101,11 @@ struct TrackResult {
     multi_key: bool,
     alternate_key: Option<String>,
     alternate_key_coverage: f32,
+    serato_bpm: Option<f32>,
+    serato_key: Option<String>,
+    serato_bpm_absolute_agreement: Option<f32>,
+    serato_bpm_octave_aware_absolute_agreement: Option<f32>,
+    serato_exact_key_agreement: Option<bool>,
     error: Option<String>,
 }
 
@@ -304,6 +313,11 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
             Err(error) => return failed_track(track, error),
         };
     let beat_scores = beat_position_f1(&track.expected_beats, &analysis.beat.beats, 0.070);
+    let serato_scores = score_serato_agreement(
+        track.serato.as_ref(),
+        analysis.beat.global_bpm,
+        analysis.key.key,
+    );
 
     TrackResult {
         id: track.id.clone(),
@@ -335,6 +349,11 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         multi_key: analysis.key.multi_key,
         alternate_key: analysis.key.alternate_key.map(|key| key.to_string()),
         alternate_key_coverage: analysis.key.alternate_coverage,
+        serato_bpm: track.serato.as_ref().and_then(|serato| serato.bpm),
+        serato_key: track.serato.as_ref().and_then(|serato| serato.key.clone()),
+        serato_bpm_absolute_agreement: serato_scores.bpm_absolute,
+        serato_bpm_octave_aware_absolute_agreement: serato_scores.bpm_octave_aware,
+        serato_exact_key_agreement: serato_scores.exact_key,
         error: None,
     }
 }
@@ -367,6 +386,11 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         multi_key: false,
         alternate_key: None,
         alternate_key_coverage: 0.0,
+        serato_bpm: track.serato.as_ref().and_then(|serato| serato.bpm),
+        serato_key: track.serato.as_ref().and_then(|serato| serato.key.clone()),
+        serato_bpm_absolute_agreement: None,
+        serato_bpm_octave_aware_absolute_agreement: None,
+        serato_exact_key_agreement: None,
         error: Some(error),
     }
 }
@@ -432,6 +456,100 @@ fn key_segment_accuracy(
     Ok(Some(
         (matching_seconds / annotated_seconds.max(f64::EPSILON)) as f32,
     ))
+}
+
+struct SeratoAgreement {
+    bpm_absolute: Option<f32>,
+    bpm_octave_aware: Option<f32>,
+    exact_key: Option<bool>,
+}
+
+fn score_serato_agreement(
+    serato: Option<&SeratoObservation>,
+    detected_bpm: Option<f32>,
+    detected_key: Option<MusicalKey>,
+) -> SeratoAgreement {
+    let Some(serato) = serato else {
+        return SeratoAgreement {
+            bpm_absolute: None,
+            bpm_octave_aware: None,
+            exact_key: None,
+        };
+    };
+
+    let bpm_absolute = paired_bpm(serato.bpm, detected_bpm)
+        .map(|(serato_bpm, trail_bpm)| (trail_bpm - serato_bpm).abs());
+    let bpm_octave_aware = paired_bpm(serato.bpm, detected_bpm)
+        .map(|(serato_bpm, trail_bpm)| octave_aware_error(serato_bpm, trail_bpm));
+
+    let exact_key = serato
+        .key
+        .as_deref()
+        .and_then(|key_str| parse_camelot_or_key(key_str).ok())
+        .map(|serato_key| Some(serato_key) == detected_key);
+
+    SeratoAgreement {
+        bpm_absolute,
+        bpm_octave_aware,
+        exact_key,
+    }
+}
+
+/// Parse a key string that may be Camelot (e.g. "8A"), standard (e.g. "A minor"), or
+/// Open Key notation.
+fn parse_camelot_or_key(value: &str) -> Result<MusicalKey, String> {
+    let trimmed = value.trim();
+    if let Some(key) = camelot_to_key(trimmed) {
+        return Ok(key);
+    }
+    parse_key(trimmed)
+}
+
+fn camelot_to_key(value: &str) -> Option<MusicalKey> {
+    let value = value.trim().to_uppercase();
+    let (number, mode_char) = if value.ends_with('A') || value.ends_with('B') {
+        let mode_char = value.as_bytes().last()?;
+        let number: u8 = value[..value.len() - 1].parse().ok()?;
+        (number, *mode_char)
+    } else {
+        return None;
+    };
+    if !(1..=12).contains(&number) {
+        return None;
+    }
+    let mode = if mode_char == b'A' {
+        Mode::Minor
+    } else {
+        Mode::Major
+    };
+    let tonic = match (number, mode) {
+        (1, Mode::Minor) => PitchClass::GSharp,
+        (2, Mode::Minor) => PitchClass::DSharp,
+        (3, Mode::Minor) => PitchClass::ASharp,
+        (4, Mode::Minor) => PitchClass::F,
+        (5, Mode::Minor) => PitchClass::C,
+        (6, Mode::Minor) => PitchClass::G,
+        (7, Mode::Minor) => PitchClass::D,
+        (8, Mode::Minor) => PitchClass::A,
+        (9, Mode::Minor) => PitchClass::E,
+        (10, Mode::Minor) => PitchClass::B,
+        (11, Mode::Minor) => PitchClass::FSharp,
+        (12, Mode::Minor) => PitchClass::CSharp,
+        (1, Mode::Major) => PitchClass::B,
+        (2, Mode::Major) => PitchClass::FSharp,
+        (3, Mode::Major) => PitchClass::CSharp,
+        (4, Mode::Major) => PitchClass::GSharp,
+        (5, Mode::Major) => PitchClass::DSharp,
+        (6, Mode::Major) => PitchClass::ASharp,
+        (7, Mode::Major) => PitchClass::F,
+        (8, Mode::Major) => PitchClass::C,
+        (9, Mode::Major) => PitchClass::G,
+        (10, Mode::Major) => PitchClass::D,
+        (11, Mode::Major) => PitchClass::A,
+        (12, Mode::Major) => PitchClass::E,
+        _ => return None,
+    };
+    Some(MusicalKey { tonic, mode })
 }
 
 #[derive(Clone, Copy)]
@@ -537,6 +655,18 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
         .filter_map(|track| track.waveform_analysis_milliseconds)
         .collect::<Vec<_>>();
 
+    let serato_bpm_errors = tracks
+        .iter()
+        .filter_map(|track| track.serato_bpm_absolute_agreement)
+        .collect::<Vec<_>>();
+    let serato_bpm_octave_errors = tracks
+        .iter()
+        .filter_map(|track| track.serato_bpm_octave_aware_absolute_agreement)
+        .collect::<Vec<_>>();
+    let serato_key_matches = tracks
+        .iter()
+        .filter_map(|track| track.serato_exact_key_agreement)
+        .collect::<Vec<_>>();
     let beat_f1_values = tracks
         .iter()
         .filter_map(|track| track.beat_f1)
@@ -568,6 +698,14 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
         beat_recall: mean_f32(&beat_recall_values),
         multi_tempo_tracks: tracks.iter().filter(|track| track.multi_tempo).count(),
         multi_key_tracks: tracks.iter().filter(|track| track.multi_key).count(),
+        serato_bpm_mean_absolute_agreement: mean_f32(&serato_bpm_errors),
+        serato_bpm_octave_aware_mean_absolute_agreement: mean_f32(&serato_bpm_octave_errors),
+        serato_exact_key_agreement: mean_f32(
+            &serato_key_matches
+                .iter()
+                .map(|matches| f32::from(u8::from(*matches)))
+                .collect::<Vec<_>>(),
+        ),
         mean_decode_milliseconds: mean_f64(&decode_times),
         mean_analysis_milliseconds: mean_f64(&analysis_times),
         mean_beat_analysis_milliseconds: mean_f64(&beat_times),
@@ -656,6 +794,88 @@ mod tests {
                 mode: Mode::Minor,
             }
         );
+    }
+
+    #[test]
+    fn parses_camelot_8a_as_a_minor() {
+        assert_eq!(
+            camelot_to_key("8A"),
+            Some(MusicalKey {
+                tonic: PitchClass::A,
+                mode: Mode::Minor,
+            })
+        );
+    }
+
+    #[test]
+    fn parses_camelot_8b_as_c_major() {
+        assert_eq!(
+            camelot_to_key("8B"),
+            Some(MusicalKey {
+                tonic: PitchClass::C,
+                mode: Mode::Major,
+            })
+        );
+    }
+
+    #[test]
+    fn parses_camelot_1a_as_g_sharp_minor() {
+        assert_eq!(
+            camelot_to_key("1A"),
+            Some(MusicalKey {
+                tonic: PitchClass::GSharp,
+                mode: Mode::Minor,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_camelot() {
+        assert_eq!(camelot_to_key("13A"), None);
+        assert_eq!(camelot_to_key("0B"), None);
+        assert_eq!(camelot_to_key("foo"), None);
+    }
+
+    #[test]
+    fn beat_f1_perfect_match() {
+        let expected = vec![
+            BeatAnnotation { time_seconds: 0.5, position_in_bar: None },
+            BeatAnnotation { time_seconds: 1.0, position_in_bar: None },
+            BeatAnnotation { time_seconds: 1.5, position_in_bar: None },
+        ];
+        let detected = vec![
+            BeatPosition { time_seconds: 0.5, confidence: 0.8 },
+            BeatPosition { time_seconds: 1.0, confidence: 0.8 },
+            BeatPosition { time_seconds: 1.5, confidence: 0.8 },
+        ];
+        let scores = beat_position_f1(&expected, &detected, 0.070).unwrap();
+        assert!((scores.f1 - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn beat_f1_with_offset() {
+        let expected = vec![
+            BeatAnnotation { time_seconds: 0.5, position_in_bar: None },
+            BeatAnnotation { time_seconds: 1.0, position_in_bar: None },
+        ];
+        let detected = vec![
+            BeatPosition { time_seconds: 0.55, confidence: 0.8 },
+            BeatPosition { time_seconds: 1.05, confidence: 0.8 },
+        ];
+        let scores = beat_position_f1(&expected, &detected, 0.070).unwrap();
+        assert!((scores.f1 - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn beat_f1_outside_tolerance() {
+        let expected = vec![
+            BeatAnnotation { time_seconds: 0.5, position_in_bar: None },
+        ];
+        let detected = vec![
+            BeatPosition { time_seconds: 0.6, confidence: 0.8 },
+        ];
+        let scores = beat_position_f1(&expected, &detected, 0.070).unwrap();
+        assert!((scores.f1 - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
