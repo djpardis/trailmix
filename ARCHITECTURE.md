@@ -38,7 +38,12 @@ own policy requires it.
 
 - Tempo estimation uses a compact energy-flux baseline, not a trained model.
 - Tempo segments represent locally stable estimates and do not yet model a
-  continuous ramp between two BPM values.
+  continuous ramp between two BPM values. When a secondary tempo covers at
+  least 25% of the file (configurable), Beat Salad sets `multi_tempo` and
+  fills `alternate_bpm` so apps can mark the primary BPM and show the other
+  song’s tempo after a beat switch. Key Lime does the same with `multi_key`
+  and `alternate_key`. This is for mashups and medleys in one file, not for
+  half vs double counting of one pulse.
 - Key segmentation is preliminary and does not yet estimate tuning offset,
   smooth short unstable classifications, or represent modal and no-key
   sections.

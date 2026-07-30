@@ -90,6 +90,14 @@ pub struct KeyAnalysis {
     pub confidence: f32,
     pub chroma: [f32; 12],
     pub segments: Vec<KeySegment>,
+    /// True when another key in the file covers enough duration to matter
+    /// (mashup / edit / medley), not a scoring tie between nearby keys.
+    /// Apps can mark the primary key (for example with a star) and show `alternate_key`.
+    pub multi_key: bool,
+    /// Other song/section key when `multi_key` is true; otherwise `None`.
+    pub alternate_key: Option<MusicalKey>,
+    /// Fraction of file duration covered by `alternate_key` (0.0 when none).
+    pub alternate_coverage: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -108,6 +116,9 @@ pub struct KeyConfig {
     pub maximum_midi_note: u8,
     pub local_window_seconds: f32,
     pub local_hop_seconds: f32,
+    /// Minimum fraction of file duration another key must cover (beat switch /
+    /// multi-song file) before `multi_key` is set. Default 0.25.
+    pub alternate_coverage_threshold: f32,
 }
 
 impl Default for KeyConfig {
@@ -119,6 +130,7 @@ impl Default for KeyConfig {
             maximum_midi_note: 95,
             local_window_seconds: 12.0,
             local_hop_seconds: 6.0,
+            alternate_coverage_threshold: 0.25,
         }
     }
 }
@@ -187,24 +199,75 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
     let confidence = key_confidence(best_score, second_score);
     let duration_seconds = samples.len() as f64 / f64::from(sample_rate);
     let segments = estimate_segments(&frame_chromas, duration_seconds, key, confidence, config);
+    let alternate =
+        significant_alternate_key(&segments, key, config.alternate_coverage_threshold);
 
     KeyAnalysis {
-        version: 3,
+        version: 4,
         key: Some(key),
         confidence,
         chroma,
         segments,
+        multi_key: alternate.is_some(),
+        alternate_key: alternate.map(|(key, _)| key),
+        alternate_coverage: alternate.map_or(0.0, |(_, coverage)| coverage),
     }
 }
 
 fn empty_analysis() -> KeyAnalysis {
     KeyAnalysis {
-        version: 3,
+        version: 4,
         key: None,
         confidence: 0.0,
         chroma: [0.0; 12],
         segments: Vec::new(),
+        multi_key: false,
+        alternate_key: None,
+        alternate_coverage: 0.0,
     }
+}
+
+fn significant_alternate_key(
+    segments: &[KeySegment],
+    primary: MusicalKey,
+    coverage_threshold: f32,
+) -> Option<(MusicalKey, f32)> {
+    if coverage_threshold <= 0.0 || segments.is_empty() {
+        return None;
+    }
+
+    let total_duration = segments
+        .iter()
+        .map(|segment| (segment.end_seconds - segment.start_seconds).max(0.0))
+        .sum::<f64>();
+    if total_duration <= f64::EPSILON {
+        return None;
+    }
+
+    let mut clusters: Vec<(MusicalKey, f64)> = Vec::new();
+    for segment in segments {
+        let duration = (segment.end_seconds - segment.start_seconds).max(0.0);
+        if duration <= f64::EPSILON || segment.key == primary {
+            continue;
+        }
+        if let Some(cluster) = clusters
+            .iter_mut()
+            .find(|(key, _)| *key == segment.key)
+        {
+            cluster.1 += duration;
+        } else {
+            clusters.push((segment.key, duration));
+        }
+    }
+
+    let (key, duration) = clusters
+        .into_iter()
+        .max_by(|left, right| left.1.total_cmp(&right.1))?;
+    let coverage = (duration / total_duration) as f32;
+    if coverage + f32::EPSILON < coverage_threshold {
+        return None;
+    }
+    Some((key, coverage))
 }
 
 fn normalize_chroma(chroma: &mut [f32; 12]) {
@@ -447,6 +510,8 @@ mod tests {
         );
         assert_eq!(result.segments.len(), 1);
         assert_eq!(result.segments[0].key, result.key.expect("key"));
+        assert!(!result.multi_key);
+        assert_eq!(result.alternate_key, None);
     }
 
     #[test]
@@ -501,11 +566,39 @@ mod tests {
             "{:?}",
             result.segments
         );
+        assert!(result.multi_key, "{result:?}");
+        assert!(result.alternate_key.is_some());
+        assert!(result.alternate_coverage >= 0.25);
+    }
+
+    #[test]
+    fn alternate_key_respects_coverage_threshold() {
+        let sample_rate = 8_000;
+        let mut samples = chord(&[220.0, 277.18, 329.63], 8.0, sample_rate);
+        samples.extend(chord(&[261.63, 311.13, 392.0], 8.0, sample_rate));
+
+        let result = analyze(
+            &samples,
+            sample_rate,
+            KeyConfig {
+                frame_size: 2_048,
+                hop_size: 1_024,
+                local_window_seconds: 4.0,
+                local_hop_seconds: 2.0,
+                alternate_coverage_threshold: 0.75,
+                ..KeyConfig::default()
+            },
+        );
+
+        assert!(!result.multi_key);
+        assert_eq!(result.alternate_key, None);
+        assert_eq!(result.alternate_coverage, 0.0);
     }
 
     #[test]
     fn rejects_silence() {
         let result = analyze(&vec![0.0; 44_100], 44_100, KeyConfig::default());
         assert_eq!(result.key, None);
+        assert!(!result.multi_key);
     }
 }

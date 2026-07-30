@@ -7,10 +7,6 @@ Trail Mix is an experimental, offline audio-analysis toolkit written in Rust.
 It takes normalized mono PCM and returns tempo, musical-key, and compact
 waveform data. It runs locally without a network service or model download.
 
-The project is still under development. Its behavior is covered by synthetic
-tests, but its accuracy has not yet been established on a representative music
-collection.
-
 ## Structure
 
 - **Beat Salad** estimates global BPM, beat positions, and local tempo segments.
@@ -36,6 +32,6 @@ versioned analysis results as JSON. CI tests Linux, macOS, and Windows.
 
 ## License
 
-Trail Mix is available under either the [MIT License](LICENSE-MIT) or the
-[Apache License, Version 2.0](LICENSE-APACHE), at your option. Codec-related
+Trail Mix is available under your choice of the [MIT License](LICENSE-MIT) or
+the [Apache License, Version 2.0](LICENSE-APACHE). Codec-related
 notices are recorded in [THIRD_PARTY.md](THIRD_PARTY.md).

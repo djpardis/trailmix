@@ -311,6 +311,20 @@ function keyLabel(key) {
   return `${tonic} ${key.mode.toLowerCase()}`;
 }
 
+function formatBpmWithAlternate(beat) {
+  const primary = beat.global_bpm?.toFixed(3) ?? "No result";
+  if (!beat.multi_tempo || beat.alternate_bpm == null) return primary;
+  const coverage = Math.round(beat.alternate_coverage * 100);
+  return `${primary}★ → ${beat.alternate_bpm.toFixed(1)} (${coverage}%)`;
+}
+
+function formatKeyWithAlternate(keyAnalysis) {
+  const primary = keyLabel(keyAnalysis.key);
+  if (!keyAnalysis.multi_key || !keyAnalysis.alternate_key) return primary;
+  const coverage = Math.round(keyAnalysis.alternate_coverage * 100);
+  return `${primary}★ → ${keyLabel(keyAnalysis.alternate_key)} (${coverage}%)`;
+}
+
 function metric(label, value) {
   const wrapper = document.createElement("div");
   wrapper.className = "metric";
@@ -335,9 +349,9 @@ async function runAnalysis() {
       { method: "POST", body: "{}" },
     );
     result.replaceChildren(
-      metric("Global BPM", analysis.beat.global_bpm?.toFixed(3) ?? "No result"),
+      metric("Global BPM", formatBpmWithAlternate(analysis.beat)),
       metric("Tempo confidence", analysis.beat.confidence.toFixed(3)),
-      metric("Global key", keyLabel(analysis.key.key)),
+      metric("Global key", formatKeyWithAlternate(analysis.key)),
       metric("Key confidence", analysis.key.confidence.toFixed(3)),
       metric("Tempo segments", String(analysis.beat.tempo_segments.length)),
       metric("Key segments", String(analysis.key.segments.length)),

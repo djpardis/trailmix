@@ -23,6 +23,14 @@ pub struct BeatAnalysis {
     pub confidence: f32,
     pub beats: Vec<BeatPosition>,
     pub tempo_segments: Vec<TempoSegment>,
+    /// True when another tempo in the file covers enough duration to matter
+    /// (mashup / edit / medley), not half vs double of one pulse.
+    /// Apps can mark `global_bpm` (for example with a star) and show `alternate_bpm`.
+    pub multi_tempo: bool,
+    /// Other song/section BPM when `multi_tempo` is true; otherwise `None`.
+    pub alternate_bpm: Option<f32>,
+    /// Fraction of file duration covered by `alternate_bpm` (0.0 when none).
+    pub alternate_coverage: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -34,6 +42,10 @@ pub struct BeatConfig {
     pub local_window_seconds: f32,
     pub local_hop_seconds: f32,
     pub segment_change_ratio: f32,
+    /// Minimum fraction of file duration another tempo must cover (beat switch /
+    /// multi-song file) before `multi_tempo` is set. Default 0.25. Unrelated to
+    /// half/double metrical ambiguity on a single pulse.
+    pub alternate_coverage_threshold: f32,
 }
 
 impl Default for BeatConfig {
@@ -46,6 +58,7 @@ impl Default for BeatConfig {
             local_window_seconds: 12.0,
             local_hop_seconds: 6.0,
             segment_change_ratio: 0.04,
+            alternate_coverage_threshold: 0.25,
         }
     }
 }
@@ -85,24 +98,89 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: BeatConfig) -> BeatAna
     );
     let tempo_segments =
         estimate_segments(&onset_envelope, envelope_rate, duration, config, global);
+    let alternate = significant_alternate_tempo(
+        &tempo_segments,
+        global.bpm,
+        config.segment_change_ratio,
+        config.alternate_coverage_threshold,
+    );
 
     BeatAnalysis {
-        version: 2,
+        version: 3,
         global_bpm: Some(global.bpm),
         confidence: global.confidence,
         beats,
         tempo_segments,
+        multi_tempo: alternate.is_some(),
+        alternate_bpm: alternate.map(|(bpm, _)| bpm),
+        alternate_coverage: alternate.map_or(0.0, |(_, coverage)| coverage),
     }
 }
 
 fn empty_analysis() -> BeatAnalysis {
     BeatAnalysis {
-        version: 2,
+        version: 3,
         global_bpm: None,
         confidence: 0.0,
         beats: Vec::new(),
         tempo_segments: Vec::new(),
+        multi_tempo: false,
+        alternate_bpm: None,
+        alternate_coverage: 0.0,
     }
+}
+
+fn bpm_matches(left: f32, right: f32, change_ratio: f32) -> bool {
+    let scale = left.abs().max(right.abs()).max(f32::EPSILON);
+    (left - right).abs() / scale <= change_ratio
+}
+
+/// Longest secondary tempo cluster by duration, if it covers enough of the track.
+fn significant_alternate_tempo(
+    segments: &[TempoSegment],
+    primary_bpm: f32,
+    change_ratio: f32,
+    coverage_threshold: f32,
+) -> Option<(f32, f32)> {
+    if coverage_threshold <= 0.0 || segments.is_empty() {
+        return None;
+    }
+
+    let total_duration = segments
+        .iter()
+        .map(|segment| (segment.end_seconds - segment.start_seconds).max(0.0))
+        .sum::<f64>();
+    if total_duration <= f64::EPSILON {
+        return None;
+    }
+
+    let mut clusters: Vec<(f32, f64)> = Vec::new();
+    for segment in segments {
+        let duration = (segment.end_seconds - segment.start_seconds).max(0.0);
+        if duration <= f64::EPSILON || bpm_matches(segment.bpm, primary_bpm, change_ratio) {
+            continue;
+        }
+        if let Some(cluster) = clusters
+            .iter_mut()
+            .find(|(bpm, _)| bpm_matches(*bpm, segment.bpm, change_ratio))
+        {
+            let total = cluster.1 + duration;
+            let weighted = f64::from(cluster.0) * cluster.1 + f64::from(segment.bpm) * duration;
+            cluster.0 = (weighted / total.max(f64::EPSILON)) as f32;
+            cluster.1 = total;
+        } else {
+            clusters.push((segment.bpm, duration));
+        }
+    }
+
+    let (bpm, duration) = clusters
+        .into_iter()
+        .max_by(|left, right| left.1.total_cmp(&right.1))?;
+    let coverage = (duration / total_duration) as f32;
+    if coverage + f32::EPSILON < coverage_threshold {
+        return None;
+    }
+    Some((bpm, coverage))
 }
 
 fn energy_onset_envelope(samples: &[f32], frame_size: usize, hop_size: usize) -> Vec<f32> {
@@ -507,6 +585,27 @@ mod tests {
             "{:?}",
             result.tempo_segments
         );
+        assert!(result.multi_tempo, "{result:?}");
+        let alternate = result.alternate_bpm.expect("alternate bpm");
+        assert!(
+            (alternate - 90.0).abs() < 5.0 || (alternate - 120.0).abs() < 5.0,
+            "alternate {alternate}"
+        );
+        assert!(result.alternate_coverage >= 0.25);
+    }
+
+    #[test]
+    fn alternate_respects_coverage_threshold() {
+        let mut samples = click_track(120.0, 24.0, 44_100);
+        samples.extend(click_track(90.0, 24.0, 44_100));
+        let config = BeatConfig {
+            alternate_coverage_threshold: 0.75,
+            ..BeatConfig::default()
+        };
+        let result = analyze(&samples, 44_100, config);
+        assert!(!result.multi_tempo);
+        assert_eq!(result.alternate_bpm, None);
+        assert_eq!(result.alternate_coverage, 0.0);
     }
 
     #[test]
@@ -514,5 +613,6 @@ mod tests {
         let result = analyze(&vec![0.0; 44_100 * 5], 44_100, BeatConfig::default());
         assert_eq!(result.global_bpm, None);
         assert!(result.beats.is_empty());
+        assert!(!result.multi_tempo);
     }
 }
