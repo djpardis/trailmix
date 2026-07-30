@@ -83,8 +83,17 @@ def build_bench(release: bool) -> Path:
         check=True,
         cwd=BENCHMARKS_DIR.parent,
     )
+    import os
+
+    target_dir = os.environ.get("CARGO_TARGET_DIR")
+    if target_dir:
+        base = Path(target_dir)
+    else:
+        base = BENCHMARKS_DIR.parent / "target"
     profile = "release" if release else "debug"
-    return BENCHMARKS_DIR.parent / "target" / profile / "trailmix-bench"
+    return base / profile / "trailmix-bench"
+    profile = "release" if release else "debug"
+    return target_dir / profile / "trailmix-bench"
 
 
 def authorize_corpus(
