@@ -18,7 +18,7 @@ command-line, and research tools without coupling them to one application.
   for downbeat inference. An optional `onnx-beat` feature enables ONNX-based
   beat tracking using external models (madmom TCN / BeatNet compatible) for
   dramatically higher beat F1 (~0.85 vs ~0.35 heuristic).
-- `key-lime` (v6) builds frame-level pitch-class profiles with Goertzel
+- `key-lime` builds frame-level pitch-class profiles with Goertzel
   measurements and classifies key at global and segment levels.
   - Harmonic summation: for each fundamental note, energy from its 2nd, 3rd,
     and 4th harmonics (at +12, +19, +24 semitones) is summed with weights

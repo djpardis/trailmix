@@ -6,9 +6,6 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[features]
-learned-key = []
-
 [dependencies]
 serde.workspace = true
 
