@@ -53,6 +53,7 @@ struct CorpusSummary {
     bpm_mean_absolute_error: Option<f32>,
     bpm_octave_aware_mean_absolute_error: Option<f32>,
     exact_key_accuracy: Option<f32>,
+    mirex_weighted_score: Option<f32>,
     tempo_segment_mean_absolute_error: Option<f32>,
     key_segment_exact_accuracy: Option<f32>,
     beat_f1: Option<f32>,
@@ -90,6 +91,7 @@ struct TrackResult {
     expected_key: Option<String>,
     detected_key: Option<String>,
     exact_key_match: Option<bool>,
+    mirex_score: Option<f32>,
     tempo_segment_mean_absolute_error: Option<f32>,
     key_segment_exact_accuracy: Option<f32>,
     beat_f1: Option<f32>,
@@ -335,6 +337,9 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         expected_key: expected_key.map(|key| key.to_string()),
         detected_key: detected_key.map(|key| key.to_string()),
         exact_key_match: expected_key.map(|expected| Some(expected) == detected_key),
+        mirex_score: expected_key
+            .zip(detected_key)
+            .map(|(expected, detected)| mirex_key_score(expected, detected)),
         tempo_segment_mean_absolute_error: tempo_segment_error(
             &track.expected_tempo_segments,
             &analysis,
@@ -375,6 +380,7 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         expected_key: track.expected_key.clone(),
         detected_key: None,
         exact_key_match: None,
+        mirex_score: None,
         tempo_segment_mean_absolute_error: None,
         key_segment_exact_accuracy: None,
         beat_f1: None,
@@ -552,6 +558,35 @@ fn camelot_to_key(value: &str) -> Option<MusicalKey> {
     Some(MusicalKey { tonic, mode })
 }
 
+/// MIREX-style weighted key evaluation score.
+/// exact = 1.0, fifth = 0.5, relative = 0.3, parallel = 0.2, other = 0.0
+fn mirex_key_score(expected: MusicalKey, detected: MusicalKey) -> f32 {
+    if expected == detected {
+        return 1.0;
+    }
+    let exp_pc = expected.tonic as i8;
+    let det_pc = detected.tonic as i8;
+    let interval = ((det_pc - exp_pc).rem_euclid(12)) as u8;
+
+    if expected.mode == detected.mode && interval == 7 {
+        return 0.5;
+    }
+
+    let is_relative = match expected.mode {
+        Mode::Major => detected.mode == Mode::Minor && interval == 9,
+        Mode::Minor => detected.mode == Mode::Major && interval == 3,
+    };
+    if is_relative {
+        return 0.3;
+    }
+
+    if expected.tonic == detected.tonic && expected.mode != detected.mode {
+        return 0.2;
+    }
+
+    0.0
+}
+
 #[derive(Clone, Copy)]
 struct BeatF1Scores {
     precision: f32,
@@ -626,6 +661,10 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
         .iter()
         .filter_map(|track| track.exact_key_match)
         .collect::<Vec<_>>();
+    let mirex_scores = tracks
+        .iter()
+        .filter_map(|track| track.mirex_score)
+        .collect::<Vec<_>>();
     let segment_errors = tracks
         .iter()
         .filter_map(|track| track.tempo_segment_mean_absolute_error)
@@ -691,6 +730,7 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
                 .map(|matches| f32::from(u8::from(*matches)))
                 .collect::<Vec<_>>(),
         ),
+        mirex_weighted_score: mean_f32(&mirex_scores),
         tempo_segment_mean_absolute_error: mean_f32(&segment_errors),
         key_segment_exact_accuracy: mean_f32(&key_segment_accuracies),
         beat_f1: mean_f32(&beat_f1_values),
@@ -881,6 +921,21 @@ mod tests {
     #[test]
     fn treats_half_time_as_octave_equivalent() {
         assert!((octave_aware_error(128.0, 64.0)).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn mirex_scores_key_relationships() {
+        let c_major = MusicalKey { tonic: PitchClass::C, mode: Mode::Major };
+        let a_minor = MusicalKey { tonic: PitchClass::A, mode: Mode::Minor };
+        let g_major = MusicalKey { tonic: PitchClass::G, mode: Mode::Major };
+        let c_minor = MusicalKey { tonic: PitchClass::C, mode: Mode::Minor };
+        let d_major = MusicalKey { tonic: PitchClass::D, mode: Mode::Major };
+
+        assert!((mirex_key_score(c_major, c_major) - 1.0).abs() < f32::EPSILON);
+        assert!((mirex_key_score(c_major, g_major) - 0.5).abs() < f32::EPSILON);
+        assert!((mirex_key_score(c_major, a_minor) - 0.3).abs() < f32::EPSILON);
+        assert!((mirex_key_score(c_major, c_minor) - 0.2).abs() < f32::EPSILON);
+        assert!((mirex_key_score(c_major, d_major) - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
