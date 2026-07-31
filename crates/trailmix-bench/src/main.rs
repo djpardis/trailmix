@@ -511,6 +511,7 @@ fn parse_camelot_or_key(value: &str) -> Result<MusicalKey, String> {
     parse_key(trimmed)
 }
 
+#[allow(clippy::match_same_arms)]
 fn camelot_to_key(value: &str) -> Option<MusicalKey> {
     let value = value.trim().to_uppercase();
     let (number, mode_char) = if value.ends_with('A') || value.ends_with('B') {
@@ -648,6 +649,7 @@ fn beat_position_f1(
     })
 }
 
+#[allow(clippy::too_many_lines)]
 fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
     let bpm_errors = tracks
         .iter()
@@ -879,14 +881,35 @@ mod tests {
     #[test]
     fn beat_f1_perfect_match() {
         let expected = vec![
-            BeatAnnotation { time_seconds: 0.5, position_in_bar: None },
-            BeatAnnotation { time_seconds: 1.0, position_in_bar: None },
-            BeatAnnotation { time_seconds: 1.5, position_in_bar: None },
+            BeatAnnotation {
+                time_seconds: 0.5,
+                position_in_bar: None,
+            },
+            BeatAnnotation {
+                time_seconds: 1.0,
+                position_in_bar: None,
+            },
+            BeatAnnotation {
+                time_seconds: 1.5,
+                position_in_bar: None,
+            },
         ];
         let detected = vec![
-            BeatPosition { time_seconds: 0.5, confidence: 0.8, position_in_bar: 1 },
-            BeatPosition { time_seconds: 1.0, confidence: 0.8, position_in_bar: 2 },
-            BeatPosition { time_seconds: 1.5, confidence: 0.8, position_in_bar: 3 },
+            BeatPosition {
+                time_seconds: 0.5,
+                confidence: 0.8,
+                position_in_bar: 1,
+            },
+            BeatPosition {
+                time_seconds: 1.0,
+                confidence: 0.8,
+                position_in_bar: 2,
+            },
+            BeatPosition {
+                time_seconds: 1.5,
+                confidence: 0.8,
+                position_in_bar: 3,
+            },
         ];
         let scores = beat_position_f1(&expected, &detected, 0.070).unwrap();
         assert!((scores.f1 - 1.0).abs() < f32::EPSILON);
@@ -895,12 +918,26 @@ mod tests {
     #[test]
     fn beat_f1_with_offset() {
         let expected = vec![
-            BeatAnnotation { time_seconds: 0.5, position_in_bar: None },
-            BeatAnnotation { time_seconds: 1.0, position_in_bar: None },
+            BeatAnnotation {
+                time_seconds: 0.5,
+                position_in_bar: None,
+            },
+            BeatAnnotation {
+                time_seconds: 1.0,
+                position_in_bar: None,
+            },
         ];
         let detected = vec![
-            BeatPosition { time_seconds: 0.55, confidence: 0.8, position_in_bar: 1 },
-            BeatPosition { time_seconds: 1.05, confidence: 0.8, position_in_bar: 2 },
+            BeatPosition {
+                time_seconds: 0.55,
+                confidence: 0.8,
+                position_in_bar: 1,
+            },
+            BeatPosition {
+                time_seconds: 1.05,
+                confidence: 0.8,
+                position_in_bar: 2,
+            },
         ];
         let scores = beat_position_f1(&expected, &detected, 0.070).unwrap();
         assert!((scores.f1 - 1.0).abs() < f32::EPSILON);
@@ -908,12 +945,15 @@ mod tests {
 
     #[test]
     fn beat_f1_outside_tolerance() {
-        let expected = vec![
-            BeatAnnotation { time_seconds: 0.5, position_in_bar: None },
-        ];
-        let detected = vec![
-            BeatPosition { time_seconds: 0.6, confidence: 0.8, position_in_bar: 1 },
-        ];
+        let expected = vec![BeatAnnotation {
+            time_seconds: 0.5,
+            position_in_bar: None,
+        }];
+        let detected = vec![BeatPosition {
+            time_seconds: 0.6,
+            confidence: 0.8,
+            position_in_bar: 1,
+        }];
         let scores = beat_position_f1(&expected, &detected, 0.070).unwrap();
         assert!((scores.f1 - 0.0).abs() < f32::EPSILON);
     }
@@ -925,11 +965,26 @@ mod tests {
 
     #[test]
     fn mirex_scores_key_relationships() {
-        let c_major = MusicalKey { tonic: PitchClass::C, mode: Mode::Major };
-        let a_minor = MusicalKey { tonic: PitchClass::A, mode: Mode::Minor };
-        let g_major = MusicalKey { tonic: PitchClass::G, mode: Mode::Major };
-        let c_minor = MusicalKey { tonic: PitchClass::C, mode: Mode::Minor };
-        let d_major = MusicalKey { tonic: PitchClass::D, mode: Mode::Major };
+        let c_major = MusicalKey {
+            tonic: PitchClass::C,
+            mode: Mode::Major,
+        };
+        let a_minor = MusicalKey {
+            tonic: PitchClass::A,
+            mode: Mode::Minor,
+        };
+        let g_major = MusicalKey {
+            tonic: PitchClass::G,
+            mode: Mode::Major,
+        };
+        let c_minor = MusicalKey {
+            tonic: PitchClass::C,
+            mode: Mode::Minor,
+        };
+        let d_major = MusicalKey {
+            tonic: PitchClass::D,
+            mode: Mode::Major,
+        };
 
         assert!((mirex_key_score(c_major, c_major) - 1.0).abs() < f32::EPSILON);
         assert!((mirex_key_score(c_major, g_major) - 0.5).abs() < f32::EPSILON);

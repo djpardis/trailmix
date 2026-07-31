@@ -218,8 +218,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
     let confidence = key_confidence(best_score, second_score);
     let duration_seconds = samples.len() as f64 / f64::from(sample_rate);
     let segments = estimate_segments(&frame_chromas, duration_seconds, key, confidence, config);
-    let alternate =
-        significant_alternate_key(&segments, key, config.alternate_coverage_threshold);
+    let alternate = significant_alternate_key(&segments, key, config.alternate_coverage_threshold);
 
     KeyAnalysis {
         version: 5,
@@ -269,10 +268,7 @@ fn significant_alternate_key(
         if duration <= f64::EPSILON || segment.key == primary {
             continue;
         }
-        if let Some(cluster) = clusters
-            .iter_mut()
-            .find(|(key, _)| *key == segment.key)
-        {
+        if let Some(cluster) = clusters.iter_mut().find(|(key, _)| *key == segment.key) {
             cluster.1 += duration;
         } else {
             clusters.push((segment.key, duration));
@@ -340,12 +336,12 @@ fn estimate_tuning(frames: &[FrameChroma]) -> f32 {
 /// Shift chroma by a fractional bin amount using linear interpolation.
 fn shift_chroma(chroma: &[f32; 12], offset: f32) -> [f32; 12] {
     let mut shifted = [0.0_f32; 12];
-    for bin in 0..12 {
+    for (bin, out) in shifted.iter_mut().enumerate() {
         let source = bin as f32 - offset;
         let lower = ((source.floor() as i32).rem_euclid(12)) as usize;
         let upper = (lower + 1) % 12;
         let fraction = source - source.floor();
-        shifted[bin] = chroma[lower] * (1.0 - fraction) + chroma[upper] * fraction;
+        *out = chroma[lower] * (1.0 - fraction) + chroma[upper] * fraction;
     }
     shifted
 }
@@ -532,10 +528,7 @@ impl GoertzelTable {
         for (fund_idx, fund_note) in notes.iter().enumerate() {
             for &(semitones, weight) in &HARMONIC_SEMITONES {
                 let harmonic_midi = fund_note.midi_note.saturating_add(semitones);
-                if let Some(harm_idx) = notes
-                    .iter()
-                    .position(|n| n.midi_note == harmonic_midi)
-                {
+                if let Some(harm_idx) = notes.iter().position(|n| n.midi_note == harmonic_midi) {
                     links[fund_idx].push(HarmonicLink {
                         harmonic_index: harm_idx,
                         weight,
@@ -640,12 +633,8 @@ fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
     const KRUMHANSL_MINOR: [f32; 12] = [
         6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17,
     ];
-    const TEMPERLEY_MAJOR: [f32; 12] = [
-        5.0, 2.0, 3.5, 2.0, 4.5, 4.0, 2.0, 4.5, 2.0, 3.5, 1.5, 4.0,
-    ];
-    const TEMPERLEY_MINOR: [f32; 12] = [
-        5.0, 2.0, 3.5, 4.5, 2.0, 4.0, 2.0, 4.5, 3.5, 2.0, 1.5, 4.0,
-    ];
+    const TEMPERLEY_MAJOR: [f32; 12] = [5.0, 2.0, 3.5, 2.0, 4.5, 4.0, 2.0, 4.5, 2.0, 3.5, 1.5, 4.0];
+    const TEMPERLEY_MINOR: [f32; 12] = [5.0, 2.0, 3.5, 4.5, 2.0, 4.0, 2.0, 4.5, 3.5, 2.0, 1.5, 4.0];
     const EDMA_MAJOR: [f32; 12] = [
         6.80, 3.00, 4.20, 2.80, 5.60, 4.40, 2.60, 5.80, 3.20, 4.40, 2.40, 3.80,
     ];
@@ -671,10 +660,7 @@ fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
             let major_corr = correlation(chroma, major_profile, root);
             let minor_corr = correlation(chroma, minor_profile, root);
 
-            for (mode, score) in [
-                (Mode::Major, major_corr),
-                (Mode::Minor, minor_corr),
-            ] {
+            for (mode, score) in [(Mode::Major, major_corr), (Mode::Minor, minor_corr)] {
                 if score > best_score {
                     second_score = best_score;
                     best_score = score;
@@ -939,7 +925,11 @@ mod tests {
         let detune_cents = 15.0;
         let detune_ratio = 2.0_f32.powf(detune_cents / 1200.0);
         let samples = chord(
-            &[220.0 * detune_ratio, 277.18 * detune_ratio, 329.63 * detune_ratio],
+            &[
+                220.0 * detune_ratio,
+                277.18 * detune_ratio,
+                329.63 * detune_ratio,
+            ],
             4.0,
             44_100,
         );
