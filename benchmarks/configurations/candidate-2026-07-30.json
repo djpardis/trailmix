@@ -1,7 +1,7 @@
 {
   "version": 2,
   "status": "frozen_candidate",
-  "source_revision": "f25681c7dd204311c4f96964bbfc5303bfd98ea1",
+  "source_revision": "3d908a7aaca85d2431df4cd1365920154e852841",
   "rust_dsp": {
     "beat": {
       "min_bpm": 60.0,
