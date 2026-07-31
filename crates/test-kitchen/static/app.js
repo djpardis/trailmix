@@ -311,6 +311,20 @@ function keyLabel(key) {
   return `${tonic} ${key.mode.toLowerCase()}`;
 }
 
+function formatBpmWithAlternate(beat) {
+  const primary = beat.global_bpm?.toFixed(3) ?? "No result";
+  if (!beat.multi_tempo || beat.alternate_bpm == null) return primary;
+  const coverage = Math.round(beat.alternate_coverage * 100);
+  return `${primary}★ → ${beat.alternate_bpm.toFixed(1)} (${coverage}%)`;
+}
+
+function formatKeyWithAlternate(keyAnalysis) {
+  const primary = keyLabel(keyAnalysis.key);
+  if (!keyAnalysis.multi_key || !keyAnalysis.alternate_key) return primary;
+  const coverage = Math.round(keyAnalysis.alternate_coverage * 100);
+  return `${primary}★ → ${keyLabel(keyAnalysis.alternate_key)} (${coverage}%)`;
+}
+
 function metric(label, value) {
   const wrapper = document.createElement("div");
   wrapper.className = "metric";
@@ -319,6 +333,34 @@ function metric(label, value) {
   const result = document.createElement("strong");
   result.textContent = value;
   wrapper.append(name, result);
+  return wrapper;
+}
+
+function chromaBar(chroma) {
+  const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const wrapper = document.createElement("div");
+  wrapper.className = "metric chroma-bar";
+  const label = document.createElement("span");
+  label.textContent = "Chroma";
+  wrapper.appendChild(label);
+
+  const barContainer = document.createElement("div");
+  barContainer.style.cssText = "display:flex;gap:2px;align-items:flex-end;height:40px;flex:1";
+  const maxVal = Math.max(...chroma, 0.001);
+  for (let i = 0; i < 12; i++) {
+    const col = document.createElement("div");
+    col.style.cssText = "display:flex;flex-direction:column;align-items:center;flex:1";
+    const bar = document.createElement("div");
+    const height = Math.round((chroma[i] / maxVal) * 32);
+    const isBlackKey = [1, 3, 6, 8, 10].includes(i);
+    bar.style.cssText = `width:100%;height:${height}px;background:${isBlackKey ? "#555" : "#2a6"};border-radius:2px`;
+    const noteLabel = document.createElement("div");
+    noteLabel.style.cssText = "font-size:9px;margin-top:2px;color:#888";
+    noteLabel.textContent = NOTES[i];
+    col.append(bar, noteLabel);
+    barContainer.appendChild(col);
+  }
+  wrapper.appendChild(barContainer);
   return wrapper;
 }
 
@@ -335,15 +377,17 @@ async function runAnalysis() {
       { method: "POST", body: "{}" },
     );
     result.replaceChildren(
-      metric("Global BPM", analysis.beat.global_bpm?.toFixed(3) ?? "No result"),
+      metric("Global BPM", formatBpmWithAlternate(analysis.beat)),
       metric("Tempo confidence", analysis.beat.confidence.toFixed(3)),
-      metric("Global key", keyLabel(analysis.key.key)),
+      metric("Global key", formatKeyWithAlternate(analysis.key)),
       metric("Key confidence", analysis.key.confidence.toFixed(3)),
       metric("Tempo segments", String(analysis.beat.tempo_segments.length)),
       metric("Key segments", String(analysis.key.segments.length)),
       metric("Detected beats", String(analysis.beat.beats.length)),
+      metric("Downbeats", String(analysis.beat.beats.filter(b => b.position_in_bar === 1).length)),
       metric("Duration", formatTime(analysis.duration_seconds)),
       metric("Waveform columns", String(analysis.waveform.columns.length)),
+      chromaBar(analysis.key.chroma),
     );
     result.classList.remove("muted");
   } catch (error) {

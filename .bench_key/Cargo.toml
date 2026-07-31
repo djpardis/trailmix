@@ -1,0 +1,8 @@
+[package]
+name = "bench_key"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+key-lime = { path = "../crates/key-lime" }
+beat-salad = { path = "../crates/beat-salad" }
