@@ -206,10 +206,15 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
     }
 
     let onset_weights = compute_onset_weights(&frame_energies);
-    for (frame, weight) in frame_chromas.iter().zip(onset_weights.iter()) {
-        for (total, value) in chroma.iter_mut().zip(frame.values) {
-            *total += value * weight;
-        }
+    let num_frames = frame_chromas.len();
+    for (pitch_class, bin) in chroma.iter_mut().enumerate() {
+        let mut values: Vec<f32> = frame_chromas
+            .iter()
+            .zip(onset_weights.iter())
+            .map(|(frame, weight)| frame.values[pitch_class] * weight)
+            .collect();
+        values.sort_unstable_by(f32::total_cmp);
+        *bin = values[num_frames / 2];
     }
 
     let total = chroma.iter().sum::<f32>();
