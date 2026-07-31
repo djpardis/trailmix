@@ -108,6 +108,8 @@ struct TrackResult {
     serato_bpm_absolute_agreement: Option<f32>,
     serato_bpm_octave_aware_absolute_agreement: Option<f32>,
     serato_exact_key_agreement: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chroma: Option<[f32; 12]>,
     error: Option<String>,
 }
 
@@ -359,6 +361,7 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         serato_bpm_absolute_agreement: serato_scores.bpm_absolute,
         serato_bpm_octave_aware_absolute_agreement: serato_scores.bpm_octave_aware,
         serato_exact_key_agreement: serato_scores.exact_key,
+        chroma: Some(analysis.key.chroma),
         error: None,
     }
 }
@@ -397,6 +400,7 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         serato_bpm_absolute_agreement: None,
         serato_bpm_octave_aware_absolute_agreement: None,
         serato_exact_key_agreement: None,
+        chroma: None,
         error: Some(error),
     }
 }
