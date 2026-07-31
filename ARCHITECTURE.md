@@ -12,10 +12,11 @@ command-line, and research tools without coupling them to one application.
 - `trailmix` is the facade and versioned aggregate result.
 - `beat-salad` calculates an energy-onset envelope, autocorrelation tempo
   candidates, a beat grid, and windowed tempo segments. Tempo estimation
-  applies a stronger octave prior (25% weight) with sub-harmonic checking to
-  reduce half/double errors. `BeatPosition` includes a `position_in_bar`
-  field (1-4, assumes 4/4 meter) for downbeat inference.
-- `key-lime` (v5) builds frame-level pitch-class profiles with Goertzel
+  applies a gentle octave prior (sigma=2 octaves, centered on 120 BPM) with
+  moderate sub-harmonic checking (15% bonus) to reduce half/double errors
+  without penalizing fast tempos (170+ BPM). `BeatPosition` includes a
+  `position_in_bar` field (1-4, assumes 4/4 meter) for downbeat inference.
+- `key-lime` (v6) builds frame-level pitch-class profiles with Goertzel
   measurements and classifies key at global and segment levels.
   - Harmonic summation: for each fundamental note, energy from its 2nd, 3rd,
     and 4th harmonics (at +12, +19, +24 semitones) is summed with weights
@@ -26,11 +27,17 @@ command-line, and research tools without coupling them to one application.
     musical styles.
   - Tuning estimation: detects sub-semitone pitch offset via parabolic
     interpolation on chroma peaks and shifts chroma before classification.
-  - Onset-weighted chroma: frames with rising energy (attacks) contribute more
-    to global chroma than sustained tails.
+  - Median chroma aggregation: the global chroma takes the per-pitch-class
+    median across all weighted frames, suppressing transient events (kick
+    drums, noise) that only dominate a fraction of frames.
+  - Onset-weighted frames: frames with rising energy (attacks) contribute more
+    weight before the median is computed.
   - Spectral whitening: power-law compression (gamma=0.5) of chroma bins
     before normalization prevents dominant frequencies from overwhelming the
     vector.
+  - Relative-key disambiguation: when the top two candidates are relative
+    (e.g., C major vs A minor) and the margin is tight, the key whose tonic
+    has more chroma energy wins.
   - Confidence-gated segmentation: `segment_confidence_threshold` (default
     0.15) prevents low-confidence local windows from creating segment
     boundaries; `minimum_segment_seconds` (default 4.0) merges short

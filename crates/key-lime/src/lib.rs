@@ -243,7 +243,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
         significant_alternate_key(&segments, final_key, config.alternate_coverage_threshold);
 
     KeyAnalysis {
-        version: 5,
+        version: 6,
         key: Some(final_key),
         confidence,
         chroma,
@@ -268,7 +268,7 @@ fn longest_segment_key(segments: &[KeySegment]) -> Option<MusicalKey> {
 
 fn empty_analysis() -> KeyAnalysis {
     KeyAnalysis {
-        version: 5,
+        version: 6,
         key: None,
         confidence: 0.0,
         chroma: [0.0; 12],
