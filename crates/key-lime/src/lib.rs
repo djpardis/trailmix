@@ -119,6 +119,12 @@ pub struct KeyConfig {
     /// Minimum fraction of file duration another key must cover (beat switch /
     /// multi-song file) before `multi_key` is set. Default 0.25.
     pub alternate_coverage_threshold: f32,
+    /// Minimum confidence a local window must have to create a new segment
+    /// boundary. Windows below this merge into the previous segment. Default 0.15.
+    pub segment_confidence_threshold: f32,
+    /// Minimum segment duration in seconds. Segments shorter than this are
+    /// absorbed by their longest neighbor. Default 8.0.
+    pub minimum_segment_seconds: f32,
 }
 
 impl Default for KeyConfig {
@@ -131,6 +137,8 @@ impl Default for KeyConfig {
             local_window_seconds: 12.0,
             local_hop_seconds: 6.0,
             alternate_coverage_threshold: 0.25,
+            segment_confidence_threshold: 0.15,
+            minimum_segment_seconds: 4.0,
         }
     }
 }
@@ -416,16 +424,20 @@ fn estimate_segments(
         }];
     }
 
+    let conf_threshold = config.segment_confidence_threshold;
     let mut groups = vec![(0, 1)];
     for index in 1..local.len() {
-        if local[index].key == local[index - 1].key {
-            groups.last_mut().expect("initial group").1 = index + 1;
-        } else {
+        let same_key = local[index].key == local[index - 1].key;
+        let confident_change = !same_key && local[index].confidence >= conf_threshold;
+        if confident_change {
             groups.push((index, index + 1));
+        } else {
+            groups.last_mut().expect("initial group").1 = index + 1;
         }
     }
 
-    groups
+    let min_duration = f64::from(config.minimum_segment_seconds);
+    let mut segments: Vec<KeySegment> = groups
         .iter()
         .enumerate()
         .map(|(group_index, &(first, end))| {
@@ -439,18 +451,75 @@ fn estimate_segments(
             } else {
                 f64::midpoint(local[end - 1].center_seconds, local[end].center_seconds)
             };
+            let avg_confidence = local[first..end]
+                .iter()
+                .map(|estimate| estimate.confidence)
+                .sum::<f32>()
+                / (end - first) as f32;
+            let majority_key = majority_key_in_range(&local[first..end]);
             KeySegment {
                 start_seconds,
                 end_seconds,
-                key: local[first].key,
-                confidence: local[first..end]
-                    .iter()
-                    .map(|estimate| estimate.confidence)
-                    .sum::<f32>()
-                    / (end - first) as f32,
+                key: majority_key,
+                confidence: avg_confidence,
             }
         })
-        .collect()
+        .collect();
+
+    merge_short_segments(&mut segments, min_duration);
+
+    segments
+}
+
+/// Find the key that covers the most estimates in a range (by count).
+fn majority_key_in_range(estimates: &[LocalEstimate]) -> MusicalKey {
+    let mut counts: Vec<(MusicalKey, usize)> = Vec::new();
+    for est in estimates {
+        if let Some(entry) = counts.iter_mut().find(|(k, _)| *k == est.key) {
+            entry.1 += 1;
+        } else {
+            counts.push((est.key, 1));
+        }
+    }
+    counts
+        .into_iter()
+        .max_by_key(|(_, count)| *count)
+        .map_or(estimates[0].key, |(key, _)| key)
+}
+
+/// Merge segments shorter than `min_duration` into their longest neighbor.
+fn merge_short_segments(segments: &mut Vec<KeySegment>, min_duration: f64) {
+    loop {
+        let short_idx = segments.iter().position(|seg| {
+            (seg.end_seconds - seg.start_seconds) < min_duration && segments.len() > 1
+        });
+        let Some(idx) = short_idx else {
+            break;
+        };
+        let merge_into = if idx == 0 {
+            1
+        } else if idx == segments.len() - 1 {
+            idx - 1
+        } else {
+            let prev_dur = segments[idx - 1].end_seconds - segments[idx - 1].start_seconds;
+            let next_dur = segments[idx + 1].end_seconds - segments[idx + 1].start_seconds;
+            if prev_dur >= next_dur {
+                idx - 1
+            } else {
+                idx + 1
+            }
+        };
+        let (keep, remove) = if merge_into < idx {
+            (merge_into, idx)
+        } else {
+            (idx, merge_into)
+        };
+        segments[keep].end_seconds = segments[remove].end_seconds.max(segments[keep].end_seconds);
+        segments[keep].start_seconds = segments[remove]
+            .start_seconds
+            .min(segments[keep].start_seconds);
+        segments.remove(remove);
+    }
 }
 
 fn hanning_window(size: usize) -> Vec<f32> {
@@ -763,6 +832,8 @@ mod tests {
                 hop_size: 1_024,
                 local_window_seconds: 4.0,
                 local_hop_seconds: 2.0,
+                segment_confidence_threshold: 0.0,
+                minimum_segment_seconds: 0.0,
                 ..KeyConfig::default()
             },
         );
@@ -806,6 +877,8 @@ mod tests {
                 local_window_seconds: 4.0,
                 local_hop_seconds: 2.0,
                 alternate_coverage_threshold: 0.75,
+                segment_confidence_threshold: 0.0,
+                minimum_segment_seconds: 0.0,
                 ..KeyConfig::default()
             },
         );
