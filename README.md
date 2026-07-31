@@ -61,7 +61,7 @@ versioned analysis results as JSON. CI tests Linux, macOS, and Windows.
 
 Trail Mix uses heuristic DSP, not trained models. On GiantSteps (EDM):
 
-- Key exact accuracy: ~34% (CNN SOTA: ~73%, transformer SOTA: ~78%)
+- Key exact accuracy: ~40% with learned profiles (CNN SOTA: ~73%, transformer SOTA: ~78%)
 - Tempo Acc2 (octave-aware): ~90%+
 - Beat F1: ~0.35 (TCN SOTA: ~0.85+)
 
