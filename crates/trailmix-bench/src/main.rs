@@ -1,5 +1,6 @@
 use std::{env, error::Error, path::Path, process::ExitCode, time::Instant};
 
+use rayon::prelude::*;
 use serde::Serialize;
 use trailmix::{Analysis, AnalysisConfig, AudioBuffer, BeatPosition, Mode, MusicalKey, PitchClass};
 use trailmix_manifest::{
@@ -124,20 +125,46 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
-    let mut arguments = env::args_os();
-    let _program = arguments.next();
-    let result = match arguments.next() {
-        None => serde_json::to_string_pretty(&run_synthetic())?,
-        Some(flag) if flag == "--manifest" => {
-            let path = arguments
-                .next()
-                .ok_or("usage: trailmix-bench [--manifest <manifest.json>]")?;
-            if arguments.next().is_some() {
-                return Err("usage: trailmix-bench [--manifest <manifest.json>]".into());
+    let args: Vec<String> = env::args().collect();
+    let mut manifest_path: Option<&str> = None;
+    let mut limit: Option<usize> = None;
+    let mut parallel = false;
+    let mut fast = false;
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--manifest" => {
+                i += 1;
+                manifest_path = Some(args.get(i).map(String::as_str).ok_or(
+                    "usage: trailmix-bench [--manifest <path>] [--limit N] [--parallel] [--fast]",
+                )?);
             }
-            serde_json::to_string_pretty(&run_manifest(Path::new(&path))?)?
+            "--limit" => {
+                i += 1;
+                limit = Some(
+                    args.get(i)
+                        .ok_or("--limit requires a number")?
+                        .parse::<usize>()?,
+                );
+            }
+            "--parallel" => parallel = true,
+            "--fast" => fast = true,
+            _ => {
+                return Err(
+                    "usage: trailmix-bench [--manifest <path>] [--limit N] [--parallel] [--fast]"
+                        .into(),
+                );
+            }
         }
-        Some(_) => return Err("usage: trailmix-bench [--manifest <manifest.json>]".into()),
+        i += 1;
+    }
+
+    let result = match manifest_path {
+        None => serde_json::to_string_pretty(&run_synthetic())?,
+        Some(path) => {
+            serde_json::to_string_pretty(&run_manifest(Path::new(path), limit, parallel, fast)?)?
+        }
     };
     println!("{result}");
     Ok(())
@@ -216,22 +243,42 @@ fn synthetic_track(bpm: f32) -> Vec<f32> {
     samples
 }
 
-fn run_manifest(path: &Path) -> Result<CorpusBenchmark, Box<dyn Error>> {
+fn run_manifest(
+    path: &Path,
+    limit: Option<usize>,
+    parallel: bool,
+    fast: bool,
+) -> Result<CorpusBenchmark, Box<dyn Error>> {
     let manifest = trailmix_manifest::load(path)?;
     let base_directory = path.parent().unwrap_or_else(|| Path::new("."));
-    let tracks = manifest
-        .tracks
-        .iter()
-        .map(|track| analyze_manifest_track(track, base_directory))
-        .collect::<Vec<_>>();
+
+    let track_slice: &[TrackAnnotation] = match limit {
+        Some(n) => &manifest.tracks[..n.min(manifest.tracks.len())],
+        None => &manifest.tracks,
+    };
+
+    let analyze_fn = |track: &TrackAnnotation| {
+        if fast {
+            analyze_manifest_track_fast(track, base_directory)
+        } else {
+            analyze_manifest_track(track, base_directory)
+        }
+    };
+
+    let tracks: Vec<TrackResult> = if parallel {
+        track_slice.par_iter().map(analyze_fn).collect()
+    } else {
+        track_slice.iter().map(analyze_fn).collect()
+    };
+
     let summary = summarize(&tracks);
 
     Ok(CorpusBenchmark {
         version: 2,
         manifest_version: manifest.version,
         track_count: tracks.len(),
-        warmup_runs: WARMUP_RUNS,
-        timed_runs: TIMED_RUNS,
+        warmup_runs: if fast { 0 } else { WARMUP_RUNS },
+        timed_runs: if fast { 1 } else { TIMED_RUNS },
         summary,
         tracks,
     })
@@ -332,6 +379,90 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         beat_analysis_milliseconds: Some(timings.beat),
         key_analysis_milliseconds: Some(timings.key),
         waveform_analysis_milliseconds: Some(timings.waveform),
+        expected_bpm: track.expected_bpm,
+        detected_bpm: analysis.beat.global_bpm,
+        bpm_absolute_error,
+        bpm_octave_aware_absolute_error,
+        expected_key: expected_key.map(|key| key.to_string()),
+        detected_key: detected_key.map(|key| key.to_string()),
+        exact_key_match: expected_key.map(|expected| Some(expected) == detected_key),
+        mirex_score: expected_key
+            .zip(detected_key)
+            .map(|(expected, detected)| mirex_key_score(expected, detected)),
+        tempo_segment_mean_absolute_error: tempo_segment_error(
+            &track.expected_tempo_segments,
+            &analysis,
+        ),
+        key_segment_exact_accuracy,
+        beat_f1: beat_scores.map(|scores| scores.f1),
+        beat_precision: beat_scores.map(|scores| scores.precision),
+        beat_recall: beat_scores.map(|scores| scores.recall),
+        multi_tempo: analysis.beat.multi_tempo,
+        alternate_bpm: analysis.beat.alternate_bpm,
+        alternate_bpm_coverage: analysis.beat.alternate_coverage,
+        multi_key: analysis.key.multi_key,
+        alternate_key: analysis.key.alternate_key.map(|key| key.to_string()),
+        alternate_key_coverage: analysis.key.alternate_coverage,
+        serato_bpm: track.serato.as_ref().and_then(|serato| serato.bpm),
+        serato_key: track.serato.as_ref().and_then(|serato| serato.key.clone()),
+        serato_bpm_absolute_agreement: serato_scores.bpm_absolute,
+        serato_bpm_octave_aware_absolute_agreement: serato_scores.bpm_octave_aware,
+        serato_exact_key_agreement: serato_scores.exact_key,
+        chroma: Some(analysis.key.chroma),
+        error: None,
+    }
+}
+
+/// Single-pass analysis without warmup or repeated timing. Used with --fast.
+fn analyze_manifest_track_fast(track: &TrackAnnotation, base_directory: &Path) -> TrackResult {
+    let path = if track.path.is_absolute() {
+        track.path.clone()
+    } else {
+        base_directory.join(&track.path)
+    };
+    let decoded = match trailmix_codecs::decode_file(path) {
+        Ok(decoded) => decoded,
+        Err(error) => return failed_track(track, error.to_string()),
+    };
+    let config = AnalysisConfig::default();
+    let analysis = trailmix::analyze(
+        AudioBuffer {
+            samples: &decoded.samples,
+            sample_rate: decoded.sample_rate,
+        },
+        config,
+    );
+
+    let expected_key = match track.expected_key.as_deref().map(parse_key).transpose() {
+        Ok(key) => key,
+        Err(error) => return failed_track(track, error),
+    };
+    let detected_key = analysis.key.key;
+    let bpm_absolute_error = paired_bpm(track.expected_bpm, analysis.beat.global_bpm)
+        .map(|(expected, detected)| (detected - expected).abs());
+    let bpm_octave_aware_absolute_error = paired_bpm(track.expected_bpm, analysis.beat.global_bpm)
+        .map(|(expected, detected)| octave_aware_error(expected, detected));
+    let key_segment_exact_accuracy =
+        match key_segment_accuracy(&track.expected_key_segments, &analysis) {
+            Ok(accuracy) => accuracy,
+            Err(error) => return failed_track(track, error),
+        };
+    let beat_scores = beat_position_f1(&track.expected_beats, &analysis.beat.beats, 0.070);
+    let serato_scores = score_serato_agreement(
+        track.serato.as_ref(),
+        analysis.beat.global_bpm,
+        analysis.key.key,
+    );
+
+    TrackResult {
+        id: track.id.clone(),
+        split: track.split.clone(),
+        duration_seconds: Some(decoded.duration_seconds()),
+        decode_milliseconds: None,
+        analysis_milliseconds: None,
+        beat_analysis_milliseconds: None,
+        key_analysis_milliseconds: None,
+        waveform_analysis_milliseconds: None,
         expected_bpm: track.expected_bpm,
         detected_bpm: analysis.beat.global_bpm,
         bpm_absolute_error,
@@ -1079,7 +1210,7 @@ mod tests {
         )
         .expect("write manifest");
 
-        let report = run_manifest(&manifest_path).expect("run benchmark");
+        let report = run_manifest(&manifest_path, None, false, false).expect("run benchmark");
         fs::remove_dir_all(directory).expect("remove fixtures");
 
         assert_eq!(report.summary.analyzed_tracks, 1);

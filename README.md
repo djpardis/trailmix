@@ -13,7 +13,7 @@ download.
 - **Beat Salad** estimates global BPM, beat positions with downbeat inference,
   and local tempo segments. Uses autocorrelation with harmonic scoring and a
   gentle octave prior.
-- **Key Lime** (v6) estimates global and local major or minor keys from chroma
+- **Key Lime** estimates global and local major or minor keys from chroma
   features using Goertzel filters, harmonic summation, multiple key profiles
   (Krumhansl-Kessler, Temperley, EDMA), median aggregation, and
   confidence-gated segmentation.
@@ -46,8 +46,6 @@ versioned analysis results as JSON. CI tests Linux, macOS, and Windows.
 ## Design principles
 
 - **Pure Rust, zero ML dependencies**: all analysis is deterministic DSP.
-  Same input always produces the same output. No GPU, no model files, no
-  Python runtime.
 - **Small binary**: all three analyzers fit in under 3 MB.
 - **Portable**: runs on ARM, x86, and WASM without platform-specific
   inference machinery.
@@ -66,9 +64,8 @@ Trail Mix uses heuristic DSP, not trained models. On GiantSteps (EDM):
 - Beat F1: ~0.35 (TCN SOTA: ~0.85+)
 
 The tradeoff is explicit: lower accuracy in exchange for zero deployment
-complexity and full transparency. See [ARCHITECTURE.md](ARCHITECTURE.md) and
-[SPEAKER_NOTES.md](SPEAKER_NOTES.md) for detailed algorithm descriptions and
-SOTA comparisons.
+complexity and full transparency. See [ARCHITECTURE.md](ARCHITECTURE.md) for
+detailed algorithm descriptions and SOTA comparisons.
 
 ## License
 
