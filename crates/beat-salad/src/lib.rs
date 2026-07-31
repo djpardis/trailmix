@@ -285,17 +285,6 @@ fn estimate_tempo(
                 family_score += base_scores[family_lag] * weight;
             }
         }
-        let sub_harmonic_bonus = if lag >= min_lag * 2 {
-            let half_lag = lag / 2;
-            if half_lag >= min_lag {
-                base_scores[half_lag] * 0.15
-            } else {
-                0.0
-            }
-        } else {
-            0.0
-        };
-        family_score += sub_harmonic_bonus;
 
         let bpm = 60.0 * envelope_rate / lag as f32;
         let log_ratio = (bpm / 120.0).log2();
