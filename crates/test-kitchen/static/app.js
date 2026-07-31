@@ -356,6 +356,7 @@ async function runAnalysis() {
       metric("Tempo segments", String(analysis.beat.tempo_segments.length)),
       metric("Key segments", String(analysis.key.segments.length)),
       metric("Detected beats", String(analysis.beat.beats.length)),
+      metric("Downbeats", String(analysis.beat.beats.filter(b => b.position_in_bar === 1).length)),
       metric("Duration", formatTime(analysis.duration_seconds)),
       metric("Waveform columns", String(analysis.waveform.columns.length)),
     );
