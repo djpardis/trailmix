@@ -748,11 +748,20 @@ fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
     const EDMA_MINOR: [f32; 12] = [
         6.60, 3.20, 4.00, 5.40, 3.00, 4.20, 2.80, 5.20, 4.40, 3.00, 3.60, 3.60,
     ];
+    const LEARNED_MAJOR: [f32; 12] = [
+        0.0972, 0.0776, 0.0833, 0.0754, 0.0850, 0.0818, 0.0749, 0.0922, 0.0743, 0.0804, 0.0766,
+        0.0831,
+    ];
+    const LEARNED_MINOR: [f32; 12] = [
+        0.0972, 0.0815, 0.0815, 0.0825, 0.0745, 0.0798, 0.0754, 0.0917, 0.0808, 0.0769, 0.0830,
+        0.0819,
+    ];
 
     let profiles: &[(&[f32; 12], &[f32; 12])] = &[
         (&KRUMHANSL_MAJOR, &KRUMHANSL_MINOR),
         (&TEMPERLEY_MAJOR, &TEMPERLEY_MINOR),
         (&EDMA_MAJOR, &EDMA_MINOR),
+        (&LEARNED_MAJOR, &LEARNED_MINOR),
     ];
 
     let mut best_key = MusicalKey {
@@ -863,7 +872,10 @@ mod mlp {
         }
         for (input_idx, &input_val) in chroma.iter().enumerate() {
             let w_offset = input_idx * HIDDEN_SIZE;
-            for (h, &w) in hidden.iter_mut().zip(W1[w_offset..w_offset + HIDDEN_SIZE].iter()) {
+            for (h, &w) in hidden
+                .iter_mut()
+                .zip(W1[w_offset..w_offset + HIDDEN_SIZE].iter())
+            {
                 *h += input_val * w;
             }
         }
@@ -877,7 +889,10 @@ mod mlp {
         }
         for (h_idx, &h_val) in hidden.iter().enumerate() {
             let w_offset = h_idx * NUM_CLASSES;
-            for (l, &w) in logits.iter_mut().zip(W2[w_offset..w_offset + NUM_CLASSES].iter()) {
+            for (l, &w) in logits
+                .iter_mut()
+                .zip(W2[w_offset..w_offset + NUM_CLASSES].iter())
+            {
                 *l += h_val * w;
             }
         }
