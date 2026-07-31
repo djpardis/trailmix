@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 pub struct BeatPosition {
     pub time_seconds: f64,
     pub confidence: f32,
+    /// 1-based position within the bar (1 = downbeat). Assumes 4/4 meter.
+    pub position_in_bar: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -400,15 +402,45 @@ fn estimate_beat_positions(
         }
     }
 
-    (best_phase..onset.len())
-        .step_by(period)
-        .map(|frame| frame as f64 * hop_size as f64 / f64::from(sample_rate))
-        .take_while(|time| *time <= duration)
-        .map(|time_seconds| BeatPosition {
-            time_seconds,
-            confidence,
+    let beat_frames: Vec<usize> = (best_phase..onset.len()).step_by(period).collect();
+    let downbeat_phase = find_downbeat_phase(onset, &beat_frames);
+
+    beat_frames
+        .iter()
+        .enumerate()
+        .map(|(beat_index, &frame)| {
+            let time_seconds = frame as f64 * hop_size as f64 / f64::from(sample_rate);
+            BeatPosition {
+                time_seconds,
+                confidence,
+                position_in_bar: ((beat_index + 4 - downbeat_phase) % 4) as u8 + 1,
+            }
         })
+        .take_while(|beat| beat.time_seconds <= duration)
         .collect()
+}
+
+/// Find the phase offset (0-3) that aligns beat index 0 with the strongest
+/// downbeat pattern. Looks at onset energy every 4th beat for each candidate phase.
+fn find_downbeat_phase(onset: &[f32], beat_frames: &[usize]) -> usize {
+    if beat_frames.len() < 4 {
+        return 0;
+    }
+    let mut best_phase = 0;
+    let mut best_energy = f32::NEG_INFINITY;
+    for phase in 0..4 {
+        let energy: f32 = beat_frames
+            .iter()
+            .skip(phase)
+            .step_by(4)
+            .filter_map(|&frame| onset.get(frame))
+            .sum();
+        if energy > best_energy {
+            best_energy = energy;
+            best_phase = phase;
+        }
+    }
+    best_phase
 }
 
 fn estimate_segments(

@@ -844,9 +844,9 @@ mod tests {
             BeatAnnotation { time_seconds: 1.5, position_in_bar: None },
         ];
         let detected = vec![
-            BeatPosition { time_seconds: 0.5, confidence: 0.8 },
-            BeatPosition { time_seconds: 1.0, confidence: 0.8 },
-            BeatPosition { time_seconds: 1.5, confidence: 0.8 },
+            BeatPosition { time_seconds: 0.5, confidence: 0.8, position_in_bar: 1 },
+            BeatPosition { time_seconds: 1.0, confidence: 0.8, position_in_bar: 2 },
+            BeatPosition { time_seconds: 1.5, confidence: 0.8, position_in_bar: 3 },
         ];
         let scores = beat_position_f1(&expected, &detected, 0.070).unwrap();
         assert!((scores.f1 - 1.0).abs() < f32::EPSILON);
@@ -859,8 +859,8 @@ mod tests {
             BeatAnnotation { time_seconds: 1.0, position_in_bar: None },
         ];
         let detected = vec![
-            BeatPosition { time_seconds: 0.55, confidence: 0.8 },
-            BeatPosition { time_seconds: 1.05, confidence: 0.8 },
+            BeatPosition { time_seconds: 0.55, confidence: 0.8, position_in_bar: 1 },
+            BeatPosition { time_seconds: 1.05, confidence: 0.8, position_in_bar: 2 },
         ];
         let scores = beat_position_f1(&expected, &detected, 0.070).unwrap();
         assert!((scores.f1 - 1.0).abs() < f32::EPSILON);
@@ -872,7 +872,7 @@ mod tests {
             BeatAnnotation { time_seconds: 0.5, position_in_bar: None },
         ];
         let detected = vec![
-            BeatPosition { time_seconds: 0.6, confidence: 0.8 },
+            BeatPosition { time_seconds: 0.6, confidence: 0.8, position_in_bar: 1 },
         ];
         let scores = beat_position_f1(&expected, &detected, 0.070).unwrap();
         assert!((scores.f1 - 0.0).abs() < f32::EPSILON);
