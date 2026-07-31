@@ -92,8 +92,6 @@ def build_bench(release: bool) -> Path:
         base = BENCHMARKS_DIR.parent / "target"
     profile = "release" if release else "debug"
     return base / profile / "trailmix-bench"
-    profile = "release" if release else "debug"
-    return target_dir / profile / "trailmix-bench"
 
 
 def authorize_corpus(

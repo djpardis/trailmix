@@ -12,10 +12,12 @@ command-line, and research tools without coupling them to one application.
 - `trailmix` is the facade and versioned aggregate result.
 - `beat-salad` calculates an energy-onset envelope, autocorrelation tempo
   candidates, a beat grid, and windowed tempo segments. Tempo estimation
-  applies a gentle octave prior (sigma=2 octaves, centered on 120 BPM) with
-  moderate sub-harmonic checking (15% bonus) to reduce half/double errors
-  without penalizing fast tempos (170+ BPM). `BeatPosition` includes a
-  `position_in_bar` field (1-4, assumes 4/4 meter) for downbeat inference.
+  applies a gentle octave prior (sigma=2 octaves, centered on 120 BPM) to
+  reduce half/double errors without penalizing fast tempos (170+ BPM).
+  `BeatPosition` includes a `position_in_bar` field (1-4, assumes 4/4 meter)
+  for downbeat inference. An optional `onnx-beat` feature enables ONNX-based
+  beat tracking using external models (madmom TCN / BeatNet compatible) for
+  dramatically higher beat F1 (~0.85 vs ~0.35 heuristic).
 - `key-lime` (v6) builds frame-level pitch-class profiles with Goertzel
   measurements and classifies key at global and segment levels.
   - Harmonic summation: for each fundamental note, energy from its 2nd, 3rd,
@@ -47,7 +49,7 @@ command-line, and research tools without coupling them to one application.
 - `sampler-platter` bins PCM into min, max, and RMS waveform columns.
 - `trailmix-codecs` provides separately selectable common-format decoders and
   downmixes decoded channels to mono PCM.
-- `trailmix-manifest` defines and validates shared private-corpus annotations.
+- `trailmix-manifest` defines and validates local evaluation-corpus annotations.
 - `trailmix-datasets` imports GiantSteps Tempo v2 and GiantSteps Key reference
   annotations into the shared manifest while retaining dataset provenance.
 - `trailmix-cli` analyzes one supported audio file for manual evaluation.
