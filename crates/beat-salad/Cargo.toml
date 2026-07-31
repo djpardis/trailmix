@@ -6,7 +6,11 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+onnx-beat = ["dep:ort"]
+
 [dependencies]
+ort = { version = "2.0.0-rc.12", optional = true, default-features = false, features = ["std"] }
 serde.workspace = true
 
 [lints]
