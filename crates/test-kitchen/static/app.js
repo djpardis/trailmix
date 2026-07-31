@@ -336,6 +336,34 @@ function metric(label, value) {
   return wrapper;
 }
 
+function chromaBar(chroma) {
+  const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const wrapper = document.createElement("div");
+  wrapper.className = "metric chroma-bar";
+  const label = document.createElement("span");
+  label.textContent = "Chroma";
+  wrapper.appendChild(label);
+
+  const barContainer = document.createElement("div");
+  barContainer.style.cssText = "display:flex;gap:2px;align-items:flex-end;height:40px;flex:1";
+  const maxVal = Math.max(...chroma, 0.001);
+  for (let i = 0; i < 12; i++) {
+    const col = document.createElement("div");
+    col.style.cssText = "display:flex;flex-direction:column;align-items:center;flex:1";
+    const bar = document.createElement("div");
+    const height = Math.round((chroma[i] / maxVal) * 32);
+    const isBlackKey = [1, 3, 6, 8, 10].includes(i);
+    bar.style.cssText = `width:100%;height:${height}px;background:${isBlackKey ? "#555" : "#2a6"};border-radius:2px`;
+    const noteLabel = document.createElement("div");
+    noteLabel.style.cssText = "font-size:9px;margin-top:2px;color:#888";
+    noteLabel.textContent = NOTES[i];
+    col.append(bar, noteLabel);
+    barContainer.appendChild(col);
+  }
+  wrapper.appendChild(barContainer);
+  return wrapper;
+}
+
 async function runAnalysis() {
   if (!state.current) return;
   const button = byId("run-analysis");
@@ -359,6 +387,7 @@ async function runAnalysis() {
       metric("Downbeats", String(analysis.beat.beats.filter(b => b.position_in_bar === 1).length)),
       metric("Duration", formatTime(analysis.duration_seconds)),
       metric("Waveform columns", String(analysis.waveform.columns.length)),
+      chromaBar(analysis.key.chroma),
     );
     result.classList.remove("muted");
   } catch (error) {
