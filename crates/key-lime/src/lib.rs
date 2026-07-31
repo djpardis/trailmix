@@ -759,6 +759,7 @@ fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
         tonic: PitchClass::C,
         mode: Mode::Major,
     };
+    let mut second_key = best_key;
     let mut best_score = f32::NEG_INFINITY;
     let mut second_score = f32::NEG_INFINITY;
 
@@ -770,6 +771,7 @@ fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
             for (mode, score) in [(Mode::Major, major_corr), (Mode::Minor, minor_corr)] {
                 if score > best_score {
                     second_score = best_score;
+                    second_key = best_key;
                     best_score = score;
                     best_key = MusicalKey {
                         tonic: PitchClass::ALL[root],
@@ -777,12 +779,53 @@ fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
                     };
                 } else if score > second_score {
                     second_score = score;
+                    second_key = MusicalKey {
+                        tonic: PitchClass::ALL[root],
+                        mode,
+                    };
                 }
             }
         }
     }
 
-    (best_key, best_score, second_score)
+    let final_key =
+        disambiguate_relative_keys(chroma, best_key, second_key, best_score, second_score);
+    (final_key, best_score, second_score)
+}
+
+fn disambiguate_relative_keys(
+    chroma: &[f32; 12],
+    best: MusicalKey,
+    second: MusicalKey,
+    best_score: f32,
+    second_score: f32,
+) -> MusicalKey {
+    let margin = best_score - second_score;
+    if margin > 0.05 {
+        return best;
+    }
+    if !are_relative_keys(best, second) {
+        return best;
+    }
+    let best_tonic_energy = chroma[best.tonic as usize];
+    let second_tonic_energy = chroma[second.tonic as usize];
+    if second_tonic_energy > best_tonic_energy * 1.2 {
+        second
+    } else {
+        best
+    }
+}
+
+fn are_relative_keys(a: MusicalKey, b: MusicalKey) -> bool {
+    if a.mode == b.mode {
+        return false;
+    }
+    let (major, minor) = if a.mode == Mode::Major {
+        (a.tonic as usize, b.tonic as usize)
+    } else {
+        (b.tonic as usize, a.tonic as usize)
+    };
+    (major + 9) % 12 == minor
 }
 
 fn correlation(chroma: &[f32; 12], profile: &[f32; 12], root: usize) -> f32 {
