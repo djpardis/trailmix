@@ -12,9 +12,5 @@
 __pycache__/
 *.py[cod]
 /benchmark-results/
-/talks/fossy-2026/node_modules/
-/talks/fossy-2026/dist/
-/talks/fossy-2026/exports/
-/talks/fossy-2026/assets/private/
 /node_modules/
 /_site/

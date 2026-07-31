@@ -1,5 +1,7 @@
 //! Compact chroma-based musical key estimation.
 
+mod hpss;
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -170,6 +172,10 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
         return empty_analysis();
     }
 
+    // HPSS: extract harmonic component to remove percussive contamination
+    let harmonic = hpss::harmonic_component(samples, config.frame_size, config.hop_size);
+    let analysis_samples = &harmonic;
+
     let window = hanning_window(config.frame_size);
     let goertzel_table = GoertzelTable::new(sample_rate, config);
     let mut windowed_frame = vec![0.0_f32; config.frame_size];
@@ -177,8 +183,8 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
     let mut frame_chromas = Vec::new();
     let mut frame_energies = Vec::new();
     let mut start = 0;
-    while start + config.frame_size <= samples.len() {
-        let frame = &samples[start..start + config.frame_size];
+    while start + config.frame_size <= analysis_samples.len() {
+        let frame = &analysis_samples[start..start + config.frame_size];
         let frame_energy = frame
             .iter()
             .filter(|sample| sample.is_finite())
