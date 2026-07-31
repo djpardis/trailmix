@@ -167,6 +167,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
     let mut windowed_frame = vec![0.0_f32; config.frame_size];
     let mut chroma = [0.0_f32; 12];
     let mut frame_chromas = Vec::new();
+    let mut frame_energies = Vec::new();
     let mut start = 0;
     while start + config.frame_size <= samples.len() {
         let frame = &samples[start..start + config.frame_size];
@@ -182,20 +183,34 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
             let mut frame_chroma = [0.0; 12];
             accumulate_chroma_windowed(&windowed_frame, &goertzel_table, &mut frame_chroma);
             normalize_chroma(&mut frame_chroma);
-            for (total, value) in chroma.iter_mut().zip(frame_chroma) {
-                *total += value;
-            }
             frame_chromas.push(FrameChroma {
                 center_seconds: (start + config.frame_size / 2) as f64 / f64::from(sample_rate),
                 values: frame_chroma,
             });
+            frame_energies.push(frame_energy);
         }
         start += config.hop_size;
+    }
+
+    if frame_chromas.is_empty() {
+        return empty_analysis();
+    }
+
+    let onset_weights = compute_onset_weights(&frame_energies);
+    for (frame, weight) in frame_chromas.iter().zip(onset_weights.iter()) {
+        for (total, value) in chroma.iter_mut().zip(frame.values) {
+            *total += value * weight;
+        }
     }
 
     let total = chroma.iter().sum::<f32>();
     if frame_chromas.is_empty() || total <= f32::EPSILON {
         return empty_analysis();
+    }
+
+    let tuning_offset = estimate_tuning(&frame_chromas);
+    if tuning_offset.abs() > 0.01 {
+        chroma = shift_chroma(&chroma, tuning_offset);
     }
     normalize_chroma(&mut chroma);
 
@@ -207,7 +222,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
         significant_alternate_key(&segments, key, config.alternate_coverage_threshold);
 
     KeyAnalysis {
-        version: 4,
+        version: 5,
         key: Some(key),
         confidence,
         chroma,
@@ -220,7 +235,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
 
 fn empty_analysis() -> KeyAnalysis {
     KeyAnalysis {
-        version: 4,
+        version: 5,
         key: None,
         confidence: 0.0,
         chroma: [0.0; 12],
@@ -272,6 +287,67 @@ fn significant_alternate_key(
         return None;
     }
     Some((key, coverage))
+}
+
+/// Compute per-frame weights that emphasize onsets (energy increases).
+/// Each frame gets a base weight of 1.0, plus a bonus proportional to positive
+/// energy flux. This makes attack moments contribute more to global chroma.
+fn compute_onset_weights(energies: &[f32]) -> Vec<f32> {
+    if energies.is_empty() {
+        return Vec::new();
+    }
+    let mut weights = vec![1.0_f32; energies.len()];
+    for i in 1..energies.len() {
+        let flux = (energies[i].sqrt() - energies[i - 1].sqrt()).max(0.0);
+        weights[i] = 1.0 + flux * 4.0;
+    }
+    weights
+}
+
+/// Estimate global tuning offset in fractional pitch-class bins (-0.5 to +0.5).
+/// Finds the weighted-average deviation of energy peaks from integer bin centers
+/// across all frames. A result of +0.3 means the track is tuned ~30 cents sharp.
+fn estimate_tuning(frames: &[FrameChroma]) -> f32 {
+    if frames.is_empty() {
+        return 0.0;
+    }
+    let mut weight_sum = 0.0_f32;
+    let mut offset_sum = 0.0_f32;
+
+    for frame in frames {
+        for bin in 0..12 {
+            let prev = frame.values[(bin + 11) % 12];
+            let center = frame.values[bin];
+            let next = frame.values[(bin + 1) % 12];
+            if center > prev && center > next && center > f32::EPSILON {
+                let denominator = 2.0 * center - prev - next;
+                if denominator > f32::EPSILON {
+                    let offset = 0.5 * (next - prev) / denominator;
+                    weight_sum += center;
+                    offset_sum += offset * center;
+                }
+            }
+        }
+    }
+
+    if weight_sum > f32::EPSILON {
+        (offset_sum / weight_sum).clamp(-0.5, 0.5)
+    } else {
+        0.0
+    }
+}
+
+/// Shift chroma by a fractional bin amount using linear interpolation.
+fn shift_chroma(chroma: &[f32; 12], offset: f32) -> [f32; 12] {
+    let mut shifted = [0.0_f32; 12];
+    for bin in 0..12 {
+        let source = bin as f32 - offset;
+        let lower = ((source.floor() as i32).rem_euclid(12)) as usize;
+        let upper = (lower + 1) % 12;
+        let fraction = source - source.floor();
+        shifted[bin] = chroma[lower] * (1.0 - fraction) + chroma[upper] * fraction;
+    }
+    shifted
 }
 
 fn normalize_chroma(chroma: &mut [f32; 12]) {
@@ -398,10 +474,19 @@ struct GoertzelNote {
     coefficient: f32,
     pitch_class: usize,
     weight: f32,
+    midi_note: u8,
+}
+
+struct HarmonicLink {
+    harmonic_index: usize,
+    weight: f32,
 }
 
 struct GoertzelTable {
     notes: Vec<GoertzelNote>,
+    /// For each note index (as a potential fundamental), the indices of its
+    /// harmonics in the notes array with their summation weights.
+    harmonics_of: Vec<Vec<HarmonicLink>>,
     pitch_class_weights: [f32; 12],
 }
 
@@ -423,12 +508,42 @@ impl GoertzelTable {
                 coefficient: 2.0 * omega.cos(),
                 pitch_class,
                 weight,
+                midi_note,
             });
         }
+
+        let harmonics_of = Self::build_harmonic_links(&notes);
+
         Self {
             notes,
+            harmonics_of,
             pitch_class_weights,
         }
+    }
+
+    fn build_harmonic_links(notes: &[GoertzelNote]) -> Vec<Vec<HarmonicLink>> {
+        const HARMONIC_SEMITONES: [(u8, f32); 3] = [
+            (12, 0.50), // 2nd harmonic: +12 semitones (octave)
+            (19, 0.33), // 3rd harmonic: +19 semitones (octave + fifth)
+            (24, 0.25), // 4th harmonic: +24 semitones (two octaves)
+        ];
+
+        let mut links: Vec<Vec<HarmonicLink>> = (0..notes.len()).map(|_| Vec::new()).collect();
+        for (fund_idx, fund_note) in notes.iter().enumerate() {
+            for &(semitones, weight) in &HARMONIC_SEMITONES {
+                let harmonic_midi = fund_note.midi_note.saturating_add(semitones);
+                if let Some(harm_idx) = notes
+                    .iter()
+                    .position(|n| n.midi_note == harmonic_midi)
+                {
+                    links[fund_idx].push(HarmonicLink {
+                        harmonic_index: harm_idx,
+                        weight,
+                    });
+                }
+            }
+        }
+        links
     }
 }
 
@@ -438,10 +553,12 @@ fn accumulate_chroma_windowed(
     chroma: &mut [f32; 12],
 ) {
     let notes = &table.notes;
-    let chunks = notes.chunks_exact(4);
-    let remainder = chunks.remainder();
+    let note_count = notes.len();
+    let remainder_start = note_count - (note_count % 4);
 
-    for chunk in chunks {
+    let mut magnitudes = vec![0.0_f32; note_count];
+
+    for (chunk_idx, chunk) in notes.chunks_exact(4).enumerate() {
         let powers = goertzel_power_batch_4(
             windowed_frame,
             [
@@ -451,14 +568,23 @@ fn accumulate_chroma_windowed(
                 chunk[3].coefficient,
             ],
         );
-        chroma[chunk[0].pitch_class] += powers[0].sqrt() * chunk[0].weight;
-        chroma[chunk[1].pitch_class] += powers[1].sqrt() * chunk[1].weight;
-        chroma[chunk[2].pitch_class] += powers[2].sqrt() * chunk[2].weight;
-        chroma[chunk[3].pitch_class] += powers[3].sqrt() * chunk[3].weight;
+        let base = chunk_idx * 4;
+        magnitudes[base] = powers[0].sqrt();
+        magnitudes[base + 1] = powers[1].sqrt();
+        magnitudes[base + 2] = powers[2].sqrt();
+        magnitudes[base + 3] = powers[3].sqrt();
     }
-    for note in remainder {
-        let magnitude = goertzel_power_prewindowed(windowed_frame, note.coefficient);
-        chroma[note.pitch_class] += magnitude.sqrt() * note.weight;
+    for idx in remainder_start..note_count {
+        let power = goertzel_power_prewindowed(windowed_frame, notes[idx].coefficient);
+        magnitudes[idx] = power.sqrt();
+    }
+
+    for (idx, note) in notes.iter().enumerate() {
+        let mut contribution = magnitudes[idx];
+        for link in &table.harmonics_of[idx] {
+            contribution += magnitudes[link.harmonic_index] * link.weight;
+        }
+        chroma[note.pitch_class] += contribution * note.weight;
     }
     normalize_pitch_class_weights(chroma, &table.pitch_class_weights);
 }
@@ -508,33 +634,62 @@ fn goertzel_power_prewindowed(samples: &[f32], coefficient: f32) -> f32 {
 }
 
 fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
-    const MAJOR_PROFILE: [f32; 12] = [
+    const KRUMHANSL_MAJOR: [f32; 12] = [
         6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88,
     ];
-    const MINOR_PROFILE: [f32; 12] = [
+    const KRUMHANSL_MINOR: [f32; 12] = [
         6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17,
     ];
+    const TEMPERLEY_MAJOR: [f32; 12] = [
+        5.0, 2.0, 3.5, 2.0, 4.5, 4.0, 2.0, 4.5, 2.0, 3.5, 1.5, 4.0,
+    ];
+    const TEMPERLEY_MINOR: [f32; 12] = [
+        5.0, 2.0, 3.5, 4.5, 2.0, 4.0, 2.0, 4.5, 3.5, 2.0, 1.5, 4.0,
+    ];
+    const EDMA_MAJOR: [f32; 12] = [
+        6.80, 3.00, 4.20, 2.80, 5.60, 4.40, 2.60, 5.80, 3.20, 4.40, 2.40, 3.80,
+    ];
+    const EDMA_MINOR: [f32; 12] = [
+        6.60, 3.20, 4.00, 5.40, 3.00, 4.20, 2.80, 5.20, 4.40, 3.00, 3.60, 3.60,
+    ];
 
-    let mut candidates = Vec::with_capacity(24);
-    for root in 0..12 {
-        candidates.push((
-            MusicalKey {
-                tonic: PitchClass::ALL[root],
-                mode: Mode::Major,
-            },
-            correlation(chroma, &MAJOR_PROFILE, root),
-        ));
-        candidates.push((
-            MusicalKey {
-                tonic: PitchClass::ALL[root],
-                mode: Mode::Minor,
-            },
-            correlation(chroma, &MINOR_PROFILE, root),
-        ));
+    let profiles: &[(&[f32; 12], &[f32; 12])] = &[
+        (&KRUMHANSL_MAJOR, &KRUMHANSL_MINOR),
+        (&TEMPERLEY_MAJOR, &TEMPERLEY_MINOR),
+        (&EDMA_MAJOR, &EDMA_MINOR),
+    ];
+
+    let mut best_key = MusicalKey {
+        tonic: PitchClass::C,
+        mode: Mode::Major,
+    };
+    let mut best_score = f32::NEG_INFINITY;
+    let mut second_score = f32::NEG_INFINITY;
+
+    for &(major_profile, minor_profile) in profiles {
+        for root in 0..12 {
+            let major_corr = correlation(chroma, major_profile, root);
+            let minor_corr = correlation(chroma, minor_profile, root);
+
+            for (mode, score) in [
+                (Mode::Major, major_corr),
+                (Mode::Minor, minor_corr),
+            ] {
+                if score > best_score {
+                    second_score = best_score;
+                    best_score = score;
+                    best_key = MusicalKey {
+                        tonic: PitchClass::ALL[root],
+                        mode,
+                    };
+                } else if score > second_score {
+                    second_score = score;
+                }
+            }
+        }
     }
-    candidates.sort_by(|left, right| right.1.total_cmp(&left.1));
 
-    (candidates[0].0, candidates[0].1, candidates[1].1)
+    (best_key, best_score, second_score)
 }
 
 fn correlation(chroma: &[f32; 12], profile: &[f32; 12], root: usize) -> f32 {
@@ -777,6 +932,27 @@ mod tests {
         let (key, coverage) = result.unwrap();
         assert_eq!(key, alternate);
         assert!((coverage - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn detects_a_detuned_major_chord() {
+        let detune_cents = 15.0;
+        let detune_ratio = 2.0_f32.powf(detune_cents / 1200.0);
+        let samples = chord(
+            &[220.0 * detune_ratio, 277.18 * detune_ratio, 329.63 * detune_ratio],
+            4.0,
+            44_100,
+        );
+        let result = analyze(&samples, 44_100, KeyConfig::default());
+        assert_eq!(
+            result.key,
+            Some(MusicalKey {
+                tonic: PitchClass::A,
+                mode: Mode::Major,
+            }),
+            "should detect A major despite 15-cent detuning, got {:?}",
+            result.key
+        );
     }
 
     #[test]
