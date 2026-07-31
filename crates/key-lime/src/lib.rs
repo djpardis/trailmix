@@ -190,6 +190,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
             apply_window(frame, &window, &mut windowed_frame);
             let mut frame_chroma = [0.0; 12];
             accumulate_chroma_windowed(&windowed_frame, &goertzel_table, &mut frame_chroma);
+            whiten_chroma(&mut frame_chroma);
             normalize_chroma(&mut frame_chroma);
             frame_chromas.push(FrameChroma {
                 center_seconds: (start + config.frame_size / 2) as f64 / f64::from(sample_rate),
@@ -226,11 +227,19 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
     let confidence = key_confidence(best_score, second_score);
     let duration_seconds = samples.len() as f64 / f64::from(sample_rate);
     let segments = estimate_segments(&frame_chromas, duration_seconds, key, confidence, config);
-    let alternate = significant_alternate_key(&segments, key, config.alternate_coverage_threshold);
+
+    let final_key = if segments.len() > 1 {
+        longest_segment_key(&segments).unwrap_or(key)
+    } else {
+        key
+    };
+
+    let alternate =
+        significant_alternate_key(&segments, final_key, config.alternate_coverage_threshold);
 
     KeyAnalysis {
         version: 5,
-        key: Some(key),
+        key: Some(final_key),
         confidence,
         chroma,
         segments,
@@ -238,6 +247,18 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
         alternate_key: alternate.map(|(key, _)| key),
         alternate_coverage: alternate.map_or(0.0, |(_, coverage)| coverage),
     }
+}
+
+/// Return the key of the longest segment by duration.
+fn longest_segment_key(segments: &[KeySegment]) -> Option<MusicalKey> {
+    segments
+        .iter()
+        .max_by(|a, b| {
+            let dur_a = a.end_seconds - a.start_seconds;
+            let dur_b = b.end_seconds - b.start_seconds;
+            dur_a.total_cmp(&dur_b)
+        })
+        .map(|seg| seg.key)
 }
 
 fn empty_analysis() -> KeyAnalysis {
@@ -352,6 +373,18 @@ fn shift_chroma(chroma: &[f32; 12], offset: f32) -> [f32; 12] {
         *out = chroma[lower] * (1.0 - fraction) + chroma[upper] * fraction;
     }
     shifted
+}
+
+/// Power-law compression of chroma bins to flatten spectral dominance.
+/// A gamma of 0.5 (square root) prevents a single strong pitch class
+/// (typically bass in EDM) from dominating the entire vector.
+fn whiten_chroma(chroma: &mut [f32; 12]) {
+    const GAMMA: f32 = 0.5;
+    for value in chroma.iter_mut() {
+        if *value > 0.0 {
+            *value = value.powf(GAMMA);
+        }
+    }
 }
 
 fn normalize_chroma(chroma: &mut [f32; 12]) {
