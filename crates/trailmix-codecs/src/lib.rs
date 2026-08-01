@@ -1,4 +1,4 @@
-//! Feature-gated file decoding adapters for Trail Mix.
+//! Feature-gated file decoding adapters for trail mix.
 
 use std::{
     error::Error as StdError,

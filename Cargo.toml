@@ -11,6 +11,7 @@ members = [
     "crates/trailmix-datasets",
     "crates/trailmix-manifest",
 ]
+exclude = [".bench_key"]
 resolver = "2"
 
 [workspace.package]
