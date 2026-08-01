@@ -1,10 +1,10 @@
 //! Smoke test: load the Beat This! ONNX model and run inference on a click track.
 //!
-//! Usage: cargo run -p beat-salad --features onnx-beat --example onnx_smoke -- models/beat_this.onnx
+//! Usage: `cargo run -p beat-salad --features onnx-beat --example onnx_smoke -- models/beat_this.onnx`
 
 use std::env;
 
-use beat_salad::onnx_beat::{track_beats, OnnxBeatConfig};
+use beat_salad::onnx_beat::{OnnxBeatConfig, track_beats};
 
 fn main() {
     let model_path = env::args()
@@ -50,7 +50,7 @@ fn main() {
             println!(
                 "\nExpected ~{expected} beats, got {}. {}",
                 beats.len(),
-                if (beats.len() as i32 - expected as i32).unsigned_abs() < 5 {
+                if beats.len().abs_diff(expected) < 5 {
                     "PASS"
                 } else {
                     "MISMATCH (may be OK depending on model)"

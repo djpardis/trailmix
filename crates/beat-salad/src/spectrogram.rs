@@ -86,7 +86,12 @@ pub fn pick_peaks(activation: &[f32], threshold: f32, hop_size: usize) -> Vec<Be
 
 /// Pick peaks from a beat activation function at a given sample rate.
 #[must_use]
-pub fn pick_peaks_at_sr(activation: &[f32], threshold: f32, hop_size: usize, sample_rate: u32) -> Vec<BeatPosition> {
+pub fn pick_peaks_at_sr(
+    activation: &[f32],
+    threshold: f32,
+    hop_size: usize,
+    sample_rate: u32,
+) -> Vec<BeatPosition> {
     if activation.is_empty() {
         return Vec::new();
     }
@@ -131,7 +136,12 @@ pub fn pick_peaks_at_sr(activation: &[f32], threshold: f32, hop_size: usize, sam
 
 /// Assign `position_in_bar` (1-4) by finding the 4-beat grouping that maximizes
 /// activation energy on the downbeat positions.
-fn assign_downbeats(beats: &mut [BeatPosition], activation: &[f32], hop_size: usize, sample_rate: u32) {
+fn assign_downbeats(
+    beats: &mut [BeatPosition],
+    activation: &[f32],
+    hop_size: usize,
+    sample_rate: u32,
+) {
     if beats.len() < 4 {
         for (i, beat) in beats.iter_mut().enumerate() {
             beat.position_in_bar = (i % 4) as u8 + 1;
@@ -177,7 +187,7 @@ fn compute_power_spectrum(frame: &[f32], window: &[f32], out: &mut [f32]) {
     let n_fft = frame.len();
     let n_bins = n_fft / 2 + 1;
     debug_assert!(out.len() >= n_bins);
-    debug_assert!(window.len() == n_fft);
+    debug_assert_eq!(window.len(), n_fft);
 
     for (bin, power) in out.iter_mut().enumerate().take(n_bins) {
         let freq = std::f32::consts::PI * 2.0 * bin as f32 / n_fft as f32;

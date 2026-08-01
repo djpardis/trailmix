@@ -226,7 +226,11 @@ fn energy_onset_envelope(samples: &[f32], frame_size: usize, hop_size: usize) ->
             let mut s1 = 0.0f32;
             let mut s2 = 0.0f32;
             for (&sample, &win) in frame.iter().zip(window.iter()) {
-                let x = if sample.is_finite() { sample * win } else { 0.0 };
+                let x = if sample.is_finite() {
+                    sample * win
+                } else {
+                    0.0
+                };
                 let s0 = x + coeff * s1 - s2;
                 s2 = s1;
                 s1 = s0;
@@ -267,6 +271,7 @@ struct TempoEstimate {
     confidence: f32,
 }
 
+#[allow(clippy::too_many_lines)]
 fn estimate_tempo(
     onset: &[f32],
     envelope_rate: f32,
@@ -369,7 +374,10 @@ fn estimate_tempo(
         best_lag
     };
 
-    let final_score = candidates.iter().find(|(l, _)| *l == final_lag).map(|(_, s)| *s).unwrap_or(best_score);
+    let final_score = candidates
+        .iter()
+        .find(|(l, _)| *l == final_lag)
+        .map_or(best_score, |(_, s)| *s);
     let second_score = candidates
         .iter()
         .filter(|(lag, _)| lag.abs_diff(final_lag) > 2)
@@ -492,16 +500,23 @@ fn estimate_beat_positions(
     // Fill DP table
     for i in period_frames.saturating_sub(search_window)..n {
         let search_start = i.saturating_sub(period_frames + search_window);
-        let search_end = i.saturating_sub(period_frames.saturating_sub(search_window)).min(i);
+        let search_end = i
+            .saturating_sub(period_frames.saturating_sub(search_window))
+            .min(i);
 
         let mut best_prev_score = f32::NEG_INFINITY;
         let mut best_prev = search_start;
 
-        for j in search_start..search_end {
+        for (j, previous_score) in cumulative_score
+            .iter()
+            .enumerate()
+            .take(search_end)
+            .skip(search_start)
+        {
             let distance = i as f32 - j as f32;
             let deviation = distance - period;
             let penalty = -(deviation * deviation) / (2.0 * penalty_width * penalty_width);
-            let score = cumulative_score[j] + penalty.exp() * 0.5;
+            let score = *previous_score + penalty.exp() * 0.5;
             if score > best_prev_score {
                 best_prev_score = score;
                 best_prev = j;
