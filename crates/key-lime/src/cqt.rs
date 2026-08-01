@@ -22,9 +22,9 @@ struct CqtNote {
     window_len: usize,
     /// Which pitch class (0-11) this note maps to
     pitch_class: usize,
-    /// Goertzel coefficient: 2*cos(2*pi*freq/sr * window_len_ratio)
+    /// Goertzel coefficient: `2*cos(2*pi*freq/sr * window_len_ratio)`
     coeff: f32,
-    /// Precomputed Hanning window for this note's window_len
+    /// Precomputed Hanning window for this note's `window_len`
     window: Vec<f32>,
 }
 
@@ -50,7 +50,7 @@ impl CqtTable {
         let mut min_window = usize::MAX;
 
         for midi in min_midi..=max_midi {
-            let freq = 440.0 * 2.0_f32.powf((midi as f32 - 69.0) / 12.0);
+            let freq = 440.0 * 2.0_f32.powf((f32::from(midi) - 69.0) / 12.0);
 
             if freq >= sr * 0.45 {
                 continue;
@@ -105,7 +105,7 @@ impl CqtTable {
 
         for note in &self.notes {
             let half = note.window_len / 2;
-            let frame_start = if center >= half { center - half } else { 0 };
+            let frame_start = center.saturating_sub(half);
             let frame_end = (frame_start + note.window_len).min(samples.len());
             let actual_len = frame_end - frame_start;
 

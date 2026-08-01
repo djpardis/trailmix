@@ -171,9 +171,13 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let result = match manifest_path {
         None => serde_json::to_string_pretty(&run_synthetic())?,
-        Some(path) => {
-            serde_json::to_string_pretty(&run_manifest(Path::new(path), limit, parallel, fast, onnx_beats_path)?)?
-        }
+        Some(path) => serde_json::to_string_pretty(&run_manifest(
+            Path::new(path),
+            limit,
+            parallel,
+            fast,
+            onnx_beats_path,
+        )?)?,
     };
     println!("{result}");
     Ok(())
@@ -293,14 +297,13 @@ fn run_manifest(
                 if let Ok(decoded) = decode_track(track, base_directory) {
                     let config = beat_salad::onnx_beat::OnnxBeatConfig::beat_this();
                     let mut session = session_arc.lock().unwrap();
-                    if let Ok(beats) =
-                        beat_salad::onnx_beat::track_beats(&mut session, &decoded.samples, decoded.sample_rate, &config)
-                    {
-                        let beat_scores = beat_position_f1(
-                            &track.expected_beats,
-                            &beats,
-                            0.070,
-                        );
+                    if let Ok(beats) = beat_salad::onnx_beat::track_beats(
+                        &mut session,
+                        &decoded.samples,
+                        decoded.sample_rate,
+                        &config,
+                    ) {
+                        let beat_scores = beat_position_f1(&track.expected_beats, &beats, 0.070);
                         result.beat_f1 = beat_scores.map(|s| s.f1);
                         result.beat_precision = beat_scores.map(|s| s.precision);
                         result.beat_recall = beat_scores.map(|s| s.recall);

@@ -9,11 +9,11 @@
 
 use ort::session::Session;
 
-use crate::spectrogram::{
-    log_mel_spectrogram_at_sr, pick_peaks_at_sr, resample_linear, DEFAULT_HOP, DEFAULT_N_FFT,
-    DEFAULT_SR,
-};
 use crate::BeatPosition;
+use crate::spectrogram::{
+    DEFAULT_HOP, DEFAULT_N_FFT, DEFAULT_SR, log_mel_spectrogram_at_sr, pick_peaks_at_sr,
+    resample_linear,
+};
 
 /// Configuration for the ONNX beat tracker.
 #[derive(Debug, Clone)]
@@ -34,6 +34,7 @@ pub struct OnnxBeatConfig {
 impl OnnxBeatConfig {
     /// Configuration preset for Beat This! (ISMIR 2024) models.
     /// Uses 22050 Hz internally (50 fps with 441-sample hop).
+    #[must_use]
     pub fn beat_this() -> Self {
         Self {
             peak_threshold: 0.3,
@@ -45,6 +46,7 @@ impl OnnxBeatConfig {
     }
 
     /// Configuration preset for madmom TCN models.
+    #[must_use]
     pub fn madmom() -> Self {
         Self {
             peak_threshold: 0.3,
@@ -92,7 +94,13 @@ pub fn track_beats(
         &resampled
     };
 
-    let spectrogram = log_mel_spectrogram_at_sr(audio, config.n_fft, config.hop_size, config.n_mels, config.model_sr);
+    let spectrogram = log_mel_spectrogram_at_sr(
+        audio,
+        config.n_fft,
+        config.hop_size,
+        config.n_mels,
+        config.model_sr,
+    );
     let n_frames = if audio.len() >= config.n_fft {
         (audio.len() - config.n_fft) / config.hop_size + 1
     } else {
@@ -106,7 +114,12 @@ pub fn track_beats(
         run_chunked_inference(session, &spectrogram, n_frames, n_mels)?
     };
 
-    let beats = pick_peaks_at_sr(&activation, config.peak_threshold, config.hop_size, config.model_sr);
+    let beats = pick_peaks_at_sr(
+        &activation,
+        config.peak_threshold,
+        config.hop_size,
+        config.model_sr,
+    );
     Ok(beats)
 }
 
@@ -133,7 +146,11 @@ fn run_chunked_inference(
 
         // Determine which portion of this chunk's activation to keep.
         // Skip the overlap region at the start (except for the first chunk).
-        let keep_start = if start == 0 { 0 } else { CHUNK_OVERLAP_FRAMES / 2 };
+        let keep_start = if start == 0 {
+            0
+        } else {
+            CHUNK_OVERLAP_FRAMES / 2
+        };
         // Skip the overlap region at the end (except for the last chunk).
         let keep_end = if end == n_frames {
             chunk_frames

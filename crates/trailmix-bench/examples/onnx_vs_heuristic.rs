@@ -1,14 +1,15 @@
 //! Compare ONNX beat tracking with heuristic beat tracking on real audio files.
 //! Reports agreement rate, timing, and per-track beat counts.
 //!
-//! Usage: cargo run --release --example onnx_vs_heuristic -p trailmix-bench --features "" -- \
-//!            <model.onnx> <audio_dir> [max_tracks]
+//! Usage:
+//! `cargo run --release --example onnx_vs_heuristic -p trailmix-bench --features "" -- <model.onnx> <audio_dir> [max_tracks]`
 
 use std::{env, fs, time::Instant};
 
-use beat_salad::onnx_beat::{track_beats, OnnxBeatConfig};
+use beat_salad::onnx_beat::{OnnxBeatConfig, track_beats};
 use trailmix::{AnalysisConfig, AudioBuffer};
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -40,7 +41,10 @@ fn main() {
         .take(max_tracks)
         .collect();
 
-    println!("Comparing ONNX vs heuristic on {} tracks\n", audio_files.len());
+    println!(
+        "Comparing ONNX vs heuristic on {} tracks\n",
+        audio_files.len()
+    );
     println!(
         "{:<40} {:>6} {:>6} {:>8} {:>8} {:>8}",
         "Track", "Heur.", "ONNX", "Agree%", "Heur ms", "ONNX ms"
@@ -80,13 +84,14 @@ fn main() {
 
         // ONNX beats
         let t1 = Instant::now();
-        let onnx_beats = match track_beats(&mut session, &decoded.samples, decoded.sample_rate, &config) {
-            Ok(b) => b,
-            Err(e) => {
-                eprintln!("  skip {} (onnx): {e}", path.display());
-                continue;
-            }
-        };
+        let onnx_beats =
+            match track_beats(&mut session, &decoded.samples, decoded.sample_rate, &config) {
+                Ok(b) => b,
+                Err(e) => {
+                    eprintln!("  skip {} (onnx): {e}", path.display());
+                    continue;
+                }
+            };
         let onnx_ms = t1.elapsed().as_secs_f64() * 1000.0;
 
         // Measure agreement: for each heuristic beat, is there an ONNX beat within tolerance?
@@ -109,7 +114,11 @@ fn main() {
             .file_stem()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_default();
-        let display_name: String = if name.len() > 38 { name[..38].to_string() } else { name };
+        let display_name: String = if name.len() > 38 {
+            name[..38].to_string()
+        } else {
+            name
+        };
 
         println!(
             "{:<40} {:>6} {:>6} {:>7.1}% {:>7.1} {:>7.1}",
@@ -135,12 +144,18 @@ fn main() {
     } else {
         100.0 * total_agreed as f64 / total_heuristic_beats as f64
     };
-    println!(
-        "\nSummary ({track_count} tracks):"
-    );
+    println!("\nSummary ({track_count} tracks):");
     println!("  Heuristic total beats: {total_heuristic_beats}");
     println!("  ONNX total beats:      {total_onnx_beats}");
     println!("  Agreement:             {overall_agreement:.1}%");
-    println!("  Heuristic total time:  {:.1}ms ({:.1}ms/track)", total_heuristic_ms, total_heuristic_ms / track_count as f64);
-    println!("  ONNX total time:       {:.1}ms ({:.1}ms/track)", total_onnx_ms, total_onnx_ms / track_count as f64);
+    println!(
+        "  Heuristic total time:  {:.1}ms ({:.1}ms/track)",
+        total_heuristic_ms,
+        total_heuristic_ms / track_count as f64
+    );
+    println!(
+        "  ONNX total time:       {:.1}ms ({:.1}ms/track)",
+        total_onnx_ms,
+        total_onnx_ms / track_count as f64
+    );
 }

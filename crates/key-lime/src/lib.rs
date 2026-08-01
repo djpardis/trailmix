@@ -160,6 +160,7 @@ struct LocalEstimate {
 
 /// Estimate global and local major or minor keys from mono PCM.
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnalysis {
     if sample_rate == 0
         || config.frame_size < 32
@@ -174,7 +175,11 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
 
     let window = hanning_window(config.frame_size);
     let goertzel_table = GoertzelTable::new(sample_rate, config);
-    let cqt_table = cqt::CqtTable::new(sample_rate, config.minimum_midi_note, config.maximum_midi_note);
+    let cqt_table = cqt::CqtTable::new(
+        sample_rate,
+        config.minimum_midi_note,
+        config.maximum_midi_note,
+    );
     let mut windowed_frame = vec![0.0_f32; config.frame_size];
     let mut chroma = [0.0_f32; 12];
     let mut frame_chromas = Vec::new();
