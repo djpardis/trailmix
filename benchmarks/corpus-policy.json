@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "development_corpora": [
+    {
+      "name": "GiantSteps Key 604",
+      "track_id_prefix": "giantsteps-key-",
+      "source_names": ["GiantSteps Key"],
+      "reason": "Results were inspected during trail mix algorithm development on 2026-07-28."
+    },
+    {
+      "name": "GiantSteps Tempo v2",
+      "track_id_prefix": "giantsteps-tempo-",
+      "source_names": ["GiantSteps Tempo"],
+      "reason": "Results were inspected during trail mix algorithm development on 2026-07-28."
+    }
+  ]
+}

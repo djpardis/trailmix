@@ -1,7 +1,7 @@
 # Third-party software
 
 The optional `trailmix-codecs` crate uses Symphonia 0.6 under the Mozilla Public
-License 2.0. Trail Mix does not copy or modify Symphonia source code.
+License 2.0. trail mix does not copy or modify Symphonia source code.
 
 The MPL permits use in a larger work under different terms, but Symphonia and
 any modifications to its covered files remain subject to the MPL. Distributors
