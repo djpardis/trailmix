@@ -1,0 +1,7 @@
+{
+  "corpus_sha256": "8ef0ed487f9008973ca2cc1a5ff0e3c5ae7324f1c326661f8ae5d964f7c42399",
+  "invalidated_at": "2026-07-29T05:06:37.932223+00:00",
+  "prior_state": "evaluated",
+  "reason": "Importer used provenance terms that are not valid trail mix annotation status values; no benchmark summary was inspected.",
+  "version": 1
+}

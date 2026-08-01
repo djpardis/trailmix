@@ -1,0 +1,24 @@
+[project]
+name = "trailmix-baselines"
+version = "0.1.0"
+description = "Reproducible external baselines for trail mix benchmarks."
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "beat-this==1.1.0",
+    "essentia>=2.1b6.dev1389",
+    "librosa>=0.11.0",
+    "remotezip>=0.12.3",
+    "requests>=2.34.2",
+    "skey",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+skey = { git = "https://github.com/deezer/s-key.git", rev = "918b83d273568d5041569bb8068843d19a335726" }
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.0",
+]

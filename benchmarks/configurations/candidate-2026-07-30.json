@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "status": "frozen_candidate",
+  "source_revision": "3d908a7aaca85d2431df4cd1365920154e852841",
+  "rust_dsp": {
+    "beat": {
+      "min_bpm": 60.0,
+      "max_bpm": 200.0,
+      "frame_size": 1024,
+      "hop_size": 512,
+      "local_window_seconds": 12.0,
+      "local_hop_seconds": 6.0,
+      "segment_change_ratio": 0.04,
+      "alternate_coverage_threshold": 0.25
+    },
+    "key": {
+      "frame_size": 4096,
+      "hop_size": 2048,
+      "minimum_midi_note": 36,
+      "maximum_midi_note": 95,
+      "local_window_seconds": 12.0,
+      "local_hop_seconds": 6.0,
+      "alternate_coverage_threshold": 0.25
+    }
+  },
+  "optional_model_backends": {
+    "key": {
+      "tool": "skey",
+      "source_revision": "918b83d273568d5041569bb8068843d19a335726",
+      "artifact_sha256": "78dfd0ad4fa9434bf7cec70a25934b7c575bda9c80e994700140770ad3a5ead4",
+      "device": "CPU"
+    },
+    "beat_and_tempo": {
+      "tool": "beat-this",
+      "version": "1.1.0",
+      "source_revision": "ad7974846029835307ba19a3d5cefbf40b243041",
+      "artifact_sha256": "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331",
+      "device": "CPU",
+      "postprocessor": "minimal_without_dbn",
+      "tempo_interval_seconds": {
+        "minimum": 0.25,
+        "maximum": 2.0,
+        "aggregation": "median"
+      }
+    }
+  },
+  "metrics": {
+    "key": {
+      "exact_accuracy": true,
+      "mirex_relationship_weights": {
+        "exact": 1.0,
+        "fifth": 0.5,
+        "relative": 0.3,
+        "parallel": 0.2,
+        "other": 0.0
+      }
+    },
+    "tempo": {
+      "relative_tolerance": 0.04,
+      "accuracy_1_factors": [1.0],
+      "accuracy_2_factors": [1.0, 0.5, 2.0, 0.3333333333333333, 3.0]
+    },
+    "beat_position": {
+      "tolerance_seconds": 0.070,
+      "f1": true
+    },
+    "serato_agreement": {
+      "bpm_absolute": true,
+      "bpm_octave_aware": true,
+      "exact_key": true
+    }
+  },
+  "development_corpora": {
+    "giantsteps_key_sha256": "423759d4c76f9e9c370c458eb15c1eb10a3897319d03f88a442c56754f74c0ec",
+    "giantsteps_tempo_sha256": "c6e67e3d0ac75d9e969a77aac8085bac7c74e1b7e75e5417e2d52dcbc08cf3ea"
+  }
+}

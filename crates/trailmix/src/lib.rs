@@ -1,4 +1,4 @@
-//! Trail Mix combines compact, offline audio analysis components.
+//! trail mix combines compact, offline audio analysis components.
 //!
 //! The public API accepts normalized mono PCM so applications can choose their
 //! own decoder and avoid paying for codec dependencies they do not need.
@@ -41,7 +41,7 @@ pub struct Analysis {
     pub waveform: WaveformOverview,
 }
 
-/// Run all Trail Mix analyzers over normalized mono PCM.
+/// Run all trail mix analyzers over normalized mono PCM.
 #[must_use]
 pub fn analyze(audio: AudioBuffer<'_>, config: AnalysisConfig) -> Analysis {
     let duration_seconds = if audio.sample_rate == 0 {

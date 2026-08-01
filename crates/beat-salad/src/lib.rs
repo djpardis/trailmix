@@ -1,11 +1,17 @@
 //! Lightweight beat, tempo, and tempo-segment analysis.
 
+#[cfg(feature = "onnx-beat")]
+pub mod onnx_beat;
+pub mod spectrogram;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct BeatPosition {
     pub time_seconds: f64,
     pub confidence: f32,
+    /// 1-based position within the bar (1 = downbeat). Assumes 4/4 meter.
+    pub position_in_bar: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -23,6 +29,14 @@ pub struct BeatAnalysis {
     pub confidence: f32,
     pub beats: Vec<BeatPosition>,
     pub tempo_segments: Vec<TempoSegment>,
+    /// True when another tempo in the file covers enough duration to matter
+    /// (mashup / edit / medley), not half vs double of one pulse.
+    /// Apps can mark `global_bpm` (for example with a star) and show `alternate_bpm`.
+    pub multi_tempo: bool,
+    /// Other song/section BPM when `multi_tempo` is true; otherwise `None`.
+    pub alternate_bpm: Option<f32>,
+    /// Fraction of file duration covered by `alternate_bpm` (0.0 when none).
+    pub alternate_coverage: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -34,6 +48,10 @@ pub struct BeatConfig {
     pub local_window_seconds: f32,
     pub local_hop_seconds: f32,
     pub segment_change_ratio: f32,
+    /// Minimum fraction of file duration another tempo must cover (beat switch /
+    /// multi-song file) before `multi_tempo` is set. Default 0.25. Unrelated to
+    /// half/double metrical ambiguity on a single pulse.
+    pub alternate_coverage_threshold: f32,
 }
 
 impl Default for BeatConfig {
@@ -46,6 +64,7 @@ impl Default for BeatConfig {
             local_window_seconds: 12.0,
             local_hop_seconds: 6.0,
             segment_change_ratio: 0.04,
+            alternate_coverage_threshold: 0.25,
         }
     }
 }
@@ -85,24 +104,89 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: BeatConfig) -> BeatAna
     );
     let tempo_segments =
         estimate_segments(&onset_envelope, envelope_rate, duration, config, global);
+    let alternate = significant_alternate_tempo(
+        &tempo_segments,
+        global.bpm,
+        config.segment_change_ratio,
+        config.alternate_coverage_threshold,
+    );
 
     BeatAnalysis {
-        version: 2,
+        version: 3,
         global_bpm: Some(global.bpm),
         confidence: global.confidence,
         beats,
         tempo_segments,
+        multi_tempo: alternate.is_some(),
+        alternate_bpm: alternate.map(|(bpm, _)| bpm),
+        alternate_coverage: alternate.map_or(0.0, |(_, coverage)| coverage),
     }
 }
 
 fn empty_analysis() -> BeatAnalysis {
     BeatAnalysis {
-        version: 2,
+        version: 3,
         global_bpm: None,
         confidence: 0.0,
         beats: Vec::new(),
         tempo_segments: Vec::new(),
+        multi_tempo: false,
+        alternate_bpm: None,
+        alternate_coverage: 0.0,
     }
+}
+
+fn bpm_matches(left: f32, right: f32, change_ratio: f32) -> bool {
+    let scale = left.abs().max(right.abs()).max(f32::EPSILON);
+    (left - right).abs() / scale <= change_ratio
+}
+
+/// Longest secondary tempo cluster by duration, if it covers enough of the track.
+fn significant_alternate_tempo(
+    segments: &[TempoSegment],
+    primary_bpm: f32,
+    change_ratio: f32,
+    coverage_threshold: f32,
+) -> Option<(f32, f32)> {
+    if coverage_threshold <= 0.0 || segments.is_empty() {
+        return None;
+    }
+
+    let total_duration = segments
+        .iter()
+        .map(|segment| (segment.end_seconds - segment.start_seconds).max(0.0))
+        .sum::<f64>();
+    if total_duration <= f64::EPSILON {
+        return None;
+    }
+
+    let mut clusters: Vec<(f32, f64)> = Vec::new();
+    for segment in segments {
+        let duration = (segment.end_seconds - segment.start_seconds).max(0.0);
+        if duration <= f64::EPSILON || bpm_matches(segment.bpm, primary_bpm, change_ratio) {
+            continue;
+        }
+        if let Some(cluster) = clusters
+            .iter_mut()
+            .find(|(bpm, _)| bpm_matches(*bpm, segment.bpm, change_ratio))
+        {
+            let total = cluster.1 + duration;
+            let weighted = f64::from(cluster.0) * cluster.1 + f64::from(segment.bpm) * duration;
+            cluster.0 = (weighted / total.max(f64::EPSILON)) as f32;
+            cluster.1 = total;
+        } else {
+            clusters.push((segment.bpm, duration));
+        }
+    }
+
+    let (bpm, duration) = clusters
+        .into_iter()
+        .max_by(|left, right| left.1.total_cmp(&right.1))?;
+    let coverage = (duration / total_duration) as f32;
+    if coverage + f32::EPSILON < coverage_threshold {
+        return None;
+    }
+    Some((bpm, coverage))
 }
 
 fn energy_onset_envelope(samples: &[f32], frame_size: usize, hop_size: usize) -> Vec<f32> {
@@ -110,34 +194,71 @@ fn energy_onset_envelope(samples: &[f32], frame_size: usize, hop_size: usize) ->
         return Vec::new();
     }
 
-    let mut energies = Vec::with_capacity((samples.len() - frame_size) / hop_size + 1);
+    // Multi-band spectral flux onset detection: compute energy in logarithmically
+    // spaced frequency bands and measure positive changes between frames.
+    // Uses 24 bands (2 per octave from ~50 Hz to ~11 kHz) for a good balance
+    // of frequency sensitivity vs computation cost.
+    let n_bands: usize = 24;
+    let min_freq = 50.0f32;
+    let max_freq = 11_000.0f32;
+    let sample_rate = 44_100.0f32; // assumed; bands are relative anyway
+
+    // Pre-compute Goertzel coefficients for each band center frequency
+    let band_freqs: Vec<f32> = (0..n_bands)
+        .map(|i| min_freq * (max_freq / min_freq).powf(i as f32 / (n_bands - 1) as f32))
+        .collect();
+    let band_coeffs: Vec<f32> = band_freqs
+        .iter()
+        .map(|&freq| 2.0 * (2.0 * std::f32::consts::PI * freq / sample_rate).cos())
+        .collect();
+
+    let window = hanning_window_beat(frame_size);
+    let mut prev_magnitudes = vec![0.0f32; n_bands];
+    let mut onset = Vec::with_capacity((samples.len() - frame_size) / hop_size + 1);
+
     let mut start = 0;
     while start + frame_size <= samples.len() {
-        let energy = samples[start..start + frame_size]
-            .iter()
-            .map(|sample| {
-                let finite = if sample.is_finite() { *sample } else { 0.0 };
-                finite * finite
-            })
-            .sum::<f32>()
-            / frame_size as f32;
-        energies.push(energy.sqrt());
+        let frame = &samples[start..start + frame_size];
+
+        // Compute magnitude at each band using Goertzel algorithm
+        let mut magnitudes = [0.0f32; 32]; // stack alloc, n_bands <= 32
+        for (band, &coeff) in band_coeffs.iter().enumerate() {
+            let mut s1 = 0.0f32;
+            let mut s2 = 0.0f32;
+            for (&sample, &win) in frame.iter().zip(window.iter()) {
+                let x = if sample.is_finite() { sample * win } else { 0.0 };
+                let s0 = x + coeff * s1 - s2;
+                s2 = s1;
+                s1 = s0;
+            }
+            magnitudes[band] = (s1 * s1 + s2 * s2 - coeff * s1 * s2).max(0.0).sqrt();
+        }
+
+        // Half-wave rectified spectral flux: sum of positive magnitude increases
+        let flux: f32 = (0..n_bands)
+            .map(|b| (magnitudes[b] - prev_magnitudes[b]).max(0.0))
+            .sum();
+
+        onset.push(flux);
+        prev_magnitudes[..n_bands].copy_from_slice(&magnitudes[..n_bands]);
         start += hop_size;
     }
 
-    let mut previous = energies.first().copied().unwrap_or_default();
-    let mut onset = Vec::with_capacity(energies.len());
-    onset.push(0.0);
-    for energy in energies.into_iter().skip(1) {
-        onset.push((energy - previous).max(0.0));
-        previous = energy;
-    }
-
+    // Noise floor subtraction
     let mean = onset.iter().sum::<f32>() / onset.len().max(1) as f32;
     for value in &mut onset {
         *value = (*value - mean * 0.25).max(0.0);
     }
     onset
+}
+
+fn hanning_window_beat(size: usize) -> Vec<f32> {
+    (0..size)
+        .map(|i| {
+            let phase = std::f32::consts::PI * 2.0 * i as f32 / size as f32;
+            0.5 * (1.0 - phase.cos())
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -175,8 +296,13 @@ fn estimate_tempo(
         .fold(0.0_f32, f32::max)
         .max(f32::EPSILON);
 
-    let mut candidates = Vec::with_capacity(max_lag - min_lag + 1);
-    for lag in min_lag..=max_lag {
+    let mut base_scores = vec![0.0; max_lag + 1];
+    for (lag, base_score) in base_scores
+        .iter_mut()
+        .enumerate()
+        .take(max_lag + 1)
+        .skip(min_lag)
+    {
         let neighborhood_start = lag.saturating_sub(1).max(1);
         let neighborhood_end = (lag + 1).min(max_lag);
         let interval_score = interval_histogram[neighborhood_start..=neighborhood_end]
@@ -187,23 +313,71 @@ fn estimate_tempo(
             .iter()
             .copied()
             .fold(0.0_f32, f32::max);
+        *base_score = 0.65 * interval_score + 0.35 * periodicity;
+    }
+
+    let mut candidates = Vec::with_capacity(max_lag - min_lag + 1);
+    for lag in min_lag..=max_lag {
+        let mut family_score = base_scores[lag];
+        // Check faster multiples (harmonics)
+        for (multiple, weight) in [(2, 0.35), (3, 0.15)] {
+            if let Some(family_lag) = lag.checked_mul(multiple)
+                && family_lag <= max_lag
+            {
+                family_score += base_scores[family_lag] * weight;
+            }
+        }
+        // Check slower sub-harmonics (3/2 and 4/3 of current lag):
+        // If there's support at the slower tempo, boost this candidate.
+        for (num, den, weight) in [(3u32, 2u32, 0.25f32), (4, 3, 0.20)] {
+            let sub_lag = (lag as u32 * num / den) as usize;
+            if sub_lag >= min_lag && sub_lag <= max_lag {
+                family_score += base_scores[sub_lag] * weight;
+            }
+        }
+
         let bpm = 60.0 * envelope_rate / lag as f32;
-        let octave_prior = (-(bpm / 120.0).log2().powi(2) / 2.0).exp();
-        let score = (0.65 * interval_score + 0.35 * periodicity) * (0.8 + 0.2 * octave_prior);
+        let log_ratio = (bpm / 120.0).log2();
+        let octave_prior = (-log_ratio.powi(2) / 8.0).exp();
+        let score = family_score * (0.75 + 0.25 * octave_prior);
         candidates.push((lag, score));
     }
 
+    // Sub-harmonic resolution: if the best candidate is fast (>160 BPM) and a
+    // candidate at 2/3 or 3/4 of that BPM has good support, prefer the slower one.
     let &(best_lag, best_score) = candidates
         .iter()
         .max_by(|left, right| left.1.total_cmp(&right.1))?;
+    let best_bpm = 60.0 * envelope_rate / best_lag as f32;
+
+    let final_lag = if best_bpm > 160.0 {
+        // Check sub-harmonics: lag * 3/2 (= 2/3 BPM) and lag * 4/3 (= 3/4 BPM)
+        let mut sub_candidate = (best_lag, best_score);
+        for (num, den) in [(3usize, 2usize), (4, 3)] {
+            let sub_lag = best_lag * num / den;
+            if sub_lag >= min_lag && sub_lag <= max_lag {
+                if let Some(&(_, sub_score)) = candidates.iter().find(|(l, _)| *l == sub_lag) {
+                    // Accept the sub-harmonic if it has at least 70% of the best score
+                    if sub_score > best_score * 0.70 && sub_score > sub_candidate.1 * 0.90 {
+                        sub_candidate = (sub_lag, sub_score);
+                    }
+                }
+            }
+        }
+        sub_candidate.0
+    } else {
+        best_lag
+    };
+
+    let final_score = candidates.iter().find(|(l, _)| *l == final_lag).map(|(_, s)| *s).unwrap_or(best_score);
     let second_score = candidates
         .iter()
-        .filter(|(lag, _)| lag.abs_diff(best_lag) > 2)
+        .filter(|(lag, _)| lag.abs_diff(final_lag) > 2)
         .map(|(_, score)| *score)
         .fold(0.0_f32, f32::max);
 
-    let refine_start = best_lag.saturating_sub(1).max(min_lag);
-    let refine_end = (best_lag + 1).min(max_lag);
+    let refine_start = final_lag.saturating_sub(1).max(min_lag);
+    let refine_end = (final_lag + 1).min(max_lag);
     let refine_weight = interval_histogram[refine_start..=refine_end]
         .iter()
         .sum::<f32>();
@@ -213,12 +387,12 @@ fn estimate_tempo(
             .sum::<f32>()
             / refine_weight
     } else {
-        best_lag as f32
+        final_lag as f32
     };
     let bpm = (60.0 * envelope_rate / period).clamp(min_bpm, max_bpm);
-    let periodicity = correlations[best_lag].clamp(0.0, 1.0);
-    let separation = if best_score > f32::EPSILON {
-        ((best_score - second_score.max(0.0)) / best_score).clamp(0.0, 1.0)
+    let periodicity = correlations[final_lag.min(correlations.len() - 1)].clamp(0.0, 1.0);
+    let separation = if final_score > f32::EPSILON {
+        ((final_score - second_score.max(0.0)) / final_score).clamp(0.0, 1.0)
     } else {
         0.0
     };
@@ -290,29 +464,114 @@ fn estimate_beat_positions(
     duration: f64,
     confidence: f32,
 ) -> Vec<BeatPosition> {
-    let period = (60.0 * envelope_rate / bpm).round().max(1.0) as usize;
-    let mut best_phase = 0;
-    let mut best_score = f32::NEG_INFINITY;
-    for phase in 0..period {
-        let score = (phase..onset.len())
-            .step_by(period)
-            .map(|index| onset[index])
-            .sum::<f32>();
-        if score > best_score {
-            best_score = score;
-            best_phase = phase;
+    let period = 60.0 * envelope_rate / bpm;
+    if period < 1.0 || onset.is_empty() {
+        return Vec::new();
+    }
+
+    // Dynamic programming beat tracking (Ellis 2007):
+    // For each frame, find the optimal predecessor beat that maximizes
+    // onset strength while penalizing deviations from expected spacing.
+    let period_frames = period.round() as usize;
+    let search_window = (period * 0.25).round() as usize; // allow 25% deviation
+    let penalty_width = period * 0.5; // Gaussian penalty sigma
+
+    // Score function: onset strength at each frame (already noise-floor subtracted)
+    // Cumulative score: best path ending at each frame
+    let n = onset.len();
+    let mut cumulative_score = vec![0.0f32; n];
+    let mut predecessor = vec![0usize; n];
+
+    // Initialize: first beat can be anywhere in the first two periods
+    let init_range = (period_frames * 2).min(n);
+    for i in 0..init_range {
+        cumulative_score[i] = onset[i];
+        predecessor[i] = i; // self = start of chain
+    }
+
+    // Fill DP table
+    for i in period_frames.saturating_sub(search_window)..n {
+        let search_start = i.saturating_sub(period_frames + search_window);
+        let search_end = i.saturating_sub(period_frames.saturating_sub(search_window)).min(i);
+
+        let mut best_prev_score = f32::NEG_INFINITY;
+        let mut best_prev = search_start;
+
+        for j in search_start..search_end {
+            let distance = i as f32 - j as f32;
+            let deviation = distance - period;
+            let penalty = -(deviation * deviation) / (2.0 * penalty_width * penalty_width);
+            let score = cumulative_score[j] + penalty.exp() * 0.5;
+            if score > best_prev_score {
+                best_prev_score = score;
+                best_prev = j;
+            }
+        }
+
+        let candidate = onset[i] + best_prev_score;
+        if candidate > cumulative_score[i] {
+            cumulative_score[i] = candidate;
+            predecessor[i] = best_prev;
         }
     }
 
-    (best_phase..onset.len())
-        .step_by(period)
-        .map(|frame| frame as f64 * hop_size as f64 / f64::from(sample_rate))
-        .take_while(|time| *time <= duration)
-        .map(|time_seconds| BeatPosition {
-            time_seconds,
-            confidence,
+    // Backtrace: find the best ending beat in the last period
+    let trace_start = n.saturating_sub(period_frames * 2);
+    let best_end = (trace_start..n)
+        .max_by(|&a, &b| cumulative_score[a].total_cmp(&cumulative_score[b]))
+        .unwrap_or(n - 1);
+
+    let mut beat_frames = Vec::new();
+    let mut current = best_end;
+    loop {
+        beat_frames.push(current);
+        let prev = predecessor[current];
+        if prev == current || prev >= current {
+            break;
+        }
+        current = prev;
+    }
+    beat_frames.reverse();
+
+    // Assign downbeats
+    let downbeat_phase = find_downbeat_phase(onset, &beat_frames);
+
+    beat_frames
+        .iter()
+        .enumerate()
+        .map(|(beat_index, &frame)| {
+            let time_seconds = frame as f64 * hop_size as f64 / f64::from(sample_rate);
+            BeatPosition {
+                time_seconds,
+                confidence,
+                position_in_bar: ((beat_index + 4 - downbeat_phase) % 4) as u8 + 1,
+            }
         })
+        .take_while(|beat| beat.time_seconds <= duration)
         .collect()
+}
+
+/// Find the phase offset (0-3) that aligns beat index 0 with the strongest
+/// downbeat pattern. Looks at onset energy every 4th beat for each candidate phase.
+fn find_downbeat_phase(onset: &[f32], beat_frames: &[usize]) -> usize {
+    if beat_frames.len() < 4 {
+        return 0;
+    }
+    let mut best_phase = 0;
+    let mut best_energy = f32::NEG_INFINITY;
+    for phase in 0..4 {
+        let energy: f32 = beat_frames
+            .iter()
+            .skip(phase)
+            .step_by(4)
+            .filter_map(|&frame| onset.get(frame))
+            .sum();
+        if energy > best_energy {
+            best_energy = energy;
+            best_phase = phase;
+        }
+    }
+    best_phase
 }
 
 fn estimate_segments(
@@ -418,6 +677,16 @@ mod tests {
         samples
     }
 
+    fn mixed_period_onset(length: usize, periods: &[(usize, f32)]) -> Vec<f32> {
+        let mut onset = vec![0.0; length];
+        for &(period, strength) in periods {
+            for position in (0..length).step_by(period) {
+                onset[position] += strength;
+            }
+        }
+        onset
+    }
+
     #[test]
     fn detects_a_120_bpm_click_track() {
         let samples = click_track(120.0, 20.0, 44_100);
@@ -444,6 +713,19 @@ mod tests {
     }
 
     #[test]
+    fn prefers_the_base_pulse_over_a_two_thirds_alias() {
+        let envelope_rate = 44_100.0 / 512.0;
+        let onset = mixed_period_onset(2_000, &[(30, 0.65), (45, 1.0)]);
+        let estimate = estimate_tempo(&onset, envelope_rate, 60.0, 200.0).expect("tempo");
+
+        assert!(
+            (estimate.bpm - 172.27).abs() < 3.0,
+            "detected {}",
+            estimate.bpm
+        );
+    }
+
+    #[test]
     fn detects_piecewise_tempo() {
         let mut samples = click_track(120.0, 24.0, 44_100);
         samples.extend(click_track(90.0, 24.0, 44_100));
@@ -466,6 +748,115 @@ mod tests {
             "{:?}",
             result.tempo_segments
         );
+        assert!(result.multi_tempo, "{result:?}");
+        let alternate = result.alternate_bpm.expect("alternate bpm");
+        assert!(
+            (alternate - 90.0).abs() < 5.0 || (alternate - 120.0).abs() < 5.0,
+            "alternate {alternate}"
+        );
+        assert!(result.alternate_coverage >= 0.25);
+    }
+
+    #[test]
+    fn alternate_respects_coverage_threshold() {
+        let mut samples = click_track(120.0, 24.0, 44_100);
+        samples.extend(click_track(90.0, 24.0, 44_100));
+        let config = BeatConfig {
+            alternate_coverage_threshold: 0.75,
+            ..BeatConfig::default()
+        };
+        let result = analyze(&samples, 44_100, config);
+        assert!(!result.multi_tempo);
+        assert_eq!(result.alternate_bpm, None);
+        assert_eq!(result.alternate_coverage, 0.0);
+    }
+
+    #[test]
+    fn single_tempo_track_has_no_alternate() {
+        let samples = click_track(120.0, 20.0, 44_100);
+        let result = analyze(&samples, 44_100, BeatConfig::default());
+        assert!(result.global_bpm.is_some());
+        assert!(!result.multi_tempo);
+        assert_eq!(result.alternate_bpm, None);
+        assert_eq!(result.alternate_coverage, 0.0);
+    }
+
+    #[test]
+    fn alternate_disabled_when_threshold_zero() {
+        let mut samples = click_track(120.0, 24.0, 44_100);
+        samples.extend(click_track(90.0, 24.0, 44_100));
+        let config = BeatConfig {
+            alternate_coverage_threshold: 0.0,
+            ..BeatConfig::default()
+        };
+        let result = analyze(&samples, 44_100, config);
+        assert!(!result.multi_tempo);
+        assert_eq!(result.alternate_bpm, None);
+    }
+
+    #[test]
+    fn significant_alternate_tempo_empty_segments() {
+        assert_eq!(significant_alternate_tempo(&[], 120.0, 0.04, 0.25), None);
+    }
+
+    #[test]
+    fn significant_alternate_tempo_single_matching_segment() {
+        let segments = vec![TempoSegment {
+            start_seconds: 0.0,
+            end_seconds: 30.0,
+            bpm: 120.0,
+            confidence: 0.8,
+        }];
+        assert_eq!(
+            significant_alternate_tempo(&segments, 120.0, 0.04, 0.25),
+            None
+        );
+    }
+
+    #[test]
+    fn significant_alternate_tempo_below_threshold() {
+        let segments = vec![
+            TempoSegment {
+                start_seconds: 0.0,
+                end_seconds: 40.0,
+                bpm: 120.0,
+                confidence: 0.8,
+            },
+            TempoSegment {
+                start_seconds: 40.0,
+                end_seconds: 48.0,
+                bpm: 90.0,
+                confidence: 0.7,
+            },
+        ];
+        // 8/48 = 16.7%, below 25% threshold
+        assert_eq!(
+            significant_alternate_tempo(&segments, 120.0, 0.04, 0.25),
+            None
+        );
+    }
+
+    #[test]
+    fn significant_alternate_tempo_above_threshold() {
+        let segments = vec![
+            TempoSegment {
+                start_seconds: 0.0,
+                end_seconds: 24.0,
+                bpm: 120.0,
+                confidence: 0.8,
+            },
+            TempoSegment {
+                start_seconds: 24.0,
+                end_seconds: 48.0,
+                bpm: 90.0,
+                confidence: 0.7,
+            },
+        ];
+        let result = significant_alternate_tempo(&segments, 120.0, 0.04, 0.25);
+        assert!(result.is_some());
+        let (bpm, coverage) = result.unwrap();
+        assert!((bpm - 90.0).abs() < 1.0);
+        assert!((coverage - 0.5).abs() < 0.01);
     }
 
     #[test]
@@ -473,5 +864,6 @@ mod tests {
         let result = analyze(&vec![0.0; 44_100 * 5], 44_100, BeatConfig::default());
         assert_eq!(result.global_bpm, None);
         assert!(result.beats.is_empty());
+        assert!(!result.multi_tempo);
     }
 }

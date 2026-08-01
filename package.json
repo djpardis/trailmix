@@ -2,7 +2,7 @@
   "name": "trailmix-site",
   "version": "0.1.0",
   "private": true,
-  "description": "GitHub Pages site for Trail Mix.",
+  "description": "GitHub Pages site for trail mix.",
   "scripts": {
     "start": "eleventy --serve --port=4175",
     "build": "eleventy"
