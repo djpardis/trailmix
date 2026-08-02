@@ -199,6 +199,7 @@ fn import(
                 expected_key_segments: Vec::new(),
                 change_events: Vec::new(),
                 serato: None,
+                apple_music_understanding: None,
                 annotation: AnnotationMetadata {
                     status: AnnotationStatus::Reviewed,
                     reviewer: Some(kind.name().to_owned()),

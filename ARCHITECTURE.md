@@ -35,6 +35,21 @@ command-line, and research tools without coupling them to one application.
     goal of lightweight, self-contained DSP. The feature exists so that
     `trailmix-bench` can measure how the heuristic pipeline compares with
     neural approaches on the same corpus.
+- Apple-specific alternative: Apple's Music Understanding framework, introduced
+  at WWDC 2026, provides on-device analysis for key, rhythm, beats, bars, tempo,
+  structure, pace, instrument activity, and loudness without requiring an
+  application to ship the model. See the
+  [Music Understanding documentation](https://developer.apple.com/documentation/musicunderstanding)
+  and the [WWDC 2026 presentation](https://developer.apple.com/videos/play/wwdc2026/253/).
+  [Cueport](https://usecueport.com/) is an early planned user, and because it
+  targets Apple devices, an Apple-specific adapter is a reasonable future
+  integration to evaluate separately. Trail Mix itself remains portable across
+  macOS, iOS, Windows, Linux, Android, and WASM. Making an Apple SDK the only
+  backend would prevent local analysis on non-Apple clients, and its internal
+  behavior would not be reproducible from this repository. Applications can
+  choose a native system backend where one exists, serialize those results for
+  sync, and still use Trail Mix elsewhere without presenting the system's work
+  as Trail Mix's contribution.
 - `key-lime` builds frame-level pitch-class profiles using dual chroma
   extraction (Goertzel + CQT) and classifies key at global and segment levels.
   - Dual chroma extraction: each frame computes chroma via both fixed-window
@@ -74,6 +89,10 @@ command-line, and research tools without coupling them to one application.
 - `trailmix-cli` analyzes one supported audio file for manual evaluation.
 - `trailmix-bench` emits machine-readable synthetic or manifest-driven
   real-track benchmark results.
+- Benchmark manifests can store external comparison observations separately
+  from ground-truth annotations, including Serato metadata and exported Apple
+  Music Understanding results. The benchmark reports BPM and key agreement for
+  each reference without treating either system's output as Trail Mix truth.
 - `test-kitchen` serves a loopback-only browser interface for playback,
   annotation, Serato observations, and on-demand analysis.
 

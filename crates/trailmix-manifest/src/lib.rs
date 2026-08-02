@@ -48,6 +48,8 @@ pub struct TrackAnnotation {
     pub change_events: Vec<ChangeEventAnnotation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub serato: Option<SeratoObservation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub apple_music_understanding: Option<AppleMusicUnderstandingObservation>,
     #[serde(default)]
     pub annotation: AnnotationMetadata,
 }
@@ -115,6 +117,21 @@ pub struct SeratoObservation {
     pub bpm_user_edited: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key_user_edited: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+}
+
+/// Results exported by Apple's Music Understanding framework for comparison.
+///
+/// These are external observations, not Trail Mix annotations or predictions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct AppleMusicUnderstandingObservation {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bpm: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub beat_times_seconds: Vec<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }
@@ -443,6 +460,7 @@ mod tests {
             expected_key_segments: Vec::new(),
             change_events: Vec::new(),
             serato: None,
+            apple_music_understanding: None,
             annotation: AnnotationMetadata::default(),
         }
     }
