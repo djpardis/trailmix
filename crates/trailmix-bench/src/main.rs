@@ -4,8 +4,8 @@ use rayon::prelude::*;
 use serde::Serialize;
 use trailmix::{Analysis, AnalysisConfig, AudioBuffer, BeatPosition, Mode, MusicalKey, PitchClass};
 use trailmix_manifest::{
-    BeatAnnotation, KeySegmentAnnotation, SeratoObservation, TempoSegmentAnnotation,
-    TrackAnnotation,
+    AppleMusicUnderstandingObservation, BeatAnnotation, KeySegmentAnnotation, SeratoObservation,
+    TempoSegmentAnnotation, TrackAnnotation,
 };
 
 const SAMPLE_RATE: u32 = 44_100;
@@ -65,6 +65,9 @@ struct CorpusSummary {
     serato_bpm_mean_absolute_agreement: Option<f32>,
     serato_bpm_octave_aware_mean_absolute_agreement: Option<f32>,
     serato_exact_key_agreement: Option<f32>,
+    apple_music_understanding_bpm_mean_absolute_agreement: Option<f32>,
+    apple_music_understanding_bpm_octave_aware_mean_absolute_agreement: Option<f32>,
+    apple_music_understanding_exact_key_agreement: Option<f32>,
     mean_decode_milliseconds: Option<f64>,
     mean_analysis_milliseconds: Option<f64>,
     mean_beat_analysis_milliseconds: Option<f64>,
@@ -109,6 +112,11 @@ struct TrackResult {
     serato_bpm_absolute_agreement: Option<f32>,
     serato_bpm_octave_aware_absolute_agreement: Option<f32>,
     serato_exact_key_agreement: Option<bool>,
+    apple_music_understanding_bpm: Option<f32>,
+    apple_music_understanding_key: Option<String>,
+    apple_music_understanding_bpm_absolute_agreement: Option<f32>,
+    apple_music_understanding_bpm_octave_aware_absolute_agreement: Option<f32>,
+    apple_music_understanding_exact_key_agreement: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     chroma: Option<[f32; 12]>,
     error: Option<String>,
@@ -420,6 +428,11 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         analysis.beat.global_bpm,
         analysis.key.key,
     );
+    let apple_music_understanding_scores = score_apple_music_understanding_agreement(
+        track.apple_music_understanding.as_ref(),
+        analysis.beat.global_bpm,
+        analysis.key.key,
+    );
 
     TrackResult {
         id: track.id.clone(),
@@ -459,6 +472,19 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         serato_bpm_absolute_agreement: serato_scores.bpm_absolute,
         serato_bpm_octave_aware_absolute_agreement: serato_scores.bpm_octave_aware,
         serato_exact_key_agreement: serato_scores.exact_key,
+        apple_music_understanding_bpm: track
+            .apple_music_understanding
+            .as_ref()
+            .and_then(|observation| observation.bpm),
+        apple_music_understanding_key: track
+            .apple_music_understanding
+            .as_ref()
+            .and_then(|observation| observation.key.clone()),
+        apple_music_understanding_bpm_absolute_agreement: apple_music_understanding_scores
+            .bpm_absolute,
+        apple_music_understanding_bpm_octave_aware_absolute_agreement:
+            apple_music_understanding_scores.bpm_octave_aware,
+        apple_music_understanding_exact_key_agreement: apple_music_understanding_scores.exact_key,
         chroma: Some(analysis.key.chroma),
         error: None,
     }
@@ -496,6 +522,11 @@ fn analyze_manifest_track_fast(track: &TrackAnnotation, base_directory: &Path) -
     let beat_scores = beat_position_f1(&track.expected_beats, &analysis.beat.beats, 0.070);
     let serato_scores = score_serato_agreement(
         track.serato.as_ref(),
+        analysis.beat.global_bpm,
+        analysis.key.key,
+    );
+    let apple_music_understanding_scores = score_apple_music_understanding_agreement(
+        track.apple_music_understanding.as_ref(),
         analysis.beat.global_bpm,
         analysis.key.key,
     );
@@ -538,6 +569,19 @@ fn analyze_manifest_track_fast(track: &TrackAnnotation, base_directory: &Path) -
         serato_bpm_absolute_agreement: serato_scores.bpm_absolute,
         serato_bpm_octave_aware_absolute_agreement: serato_scores.bpm_octave_aware,
         serato_exact_key_agreement: serato_scores.exact_key,
+        apple_music_understanding_bpm: track
+            .apple_music_understanding
+            .as_ref()
+            .and_then(|observation| observation.bpm),
+        apple_music_understanding_key: track
+            .apple_music_understanding
+            .as_ref()
+            .and_then(|observation| observation.key.clone()),
+        apple_music_understanding_bpm_absolute_agreement: apple_music_understanding_scores
+            .bpm_absolute,
+        apple_music_understanding_bpm_octave_aware_absolute_agreement:
+            apple_music_understanding_scores.bpm_octave_aware,
+        apple_music_understanding_exact_key_agreement: apple_music_understanding_scores.exact_key,
         chroma: Some(analysis.key.chroma),
         error: None,
     }
@@ -589,6 +633,17 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         serato_bpm_absolute_agreement: None,
         serato_bpm_octave_aware_absolute_agreement: None,
         serato_exact_key_agreement: None,
+        apple_music_understanding_bpm: track
+            .apple_music_understanding
+            .as_ref()
+            .and_then(|observation| observation.bpm),
+        apple_music_understanding_key: track
+            .apple_music_understanding
+            .as_ref()
+            .and_then(|observation| observation.key.clone()),
+        apple_music_understanding_bpm_absolute_agreement: None,
+        apple_music_understanding_bpm_octave_aware_absolute_agreement: None,
+        apple_music_understanding_exact_key_agreement: None,
         chroma: None,
         error: Some(error),
     }
@@ -686,6 +741,36 @@ fn score_serato_agreement(
         .as_deref()
         .and_then(|key_str| parse_camelot_or_key(key_str).ok())
         .map(|serato_key| Some(serato_key) == detected_key);
+
+    SeratoAgreement {
+        bpm_absolute,
+        bpm_octave_aware,
+        exact_key,
+    }
+}
+
+fn score_apple_music_understanding_agreement(
+    observation: Option<&AppleMusicUnderstandingObservation>,
+    detected_bpm: Option<f32>,
+    detected_key: Option<MusicalKey>,
+) -> SeratoAgreement {
+    let Some(observation) = observation else {
+        return SeratoAgreement {
+            bpm_absolute: None,
+            bpm_octave_aware: None,
+            exact_key: None,
+        };
+    };
+
+    let bpm_absolute = paired_bpm(observation.bpm, detected_bpm)
+        .map(|(reference_bpm, trail_bpm)| (trail_bpm - reference_bpm).abs());
+    let bpm_octave_aware = paired_bpm(observation.bpm, detected_bpm)
+        .map(|(reference_bpm, trail_bpm)| octave_aware_error(reference_bpm, trail_bpm));
+    let exact_key = observation
+        .key
+        .as_deref()
+        .and_then(|key_str| parse_key(key_str).ok())
+        .map(|reference_key| Some(reference_key) == detected_key);
 
     SeratoAgreement {
         bpm_absolute,
@@ -901,6 +986,18 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
         .iter()
         .filter_map(|track| track.serato_exact_key_agreement)
         .collect::<Vec<_>>();
+    let apple_music_understanding_bpm_errors = tracks
+        .iter()
+        .filter_map(|track| track.apple_music_understanding_bpm_absolute_agreement)
+        .collect::<Vec<_>>();
+    let apple_music_understanding_bpm_octave_errors = tracks
+        .iter()
+        .filter_map(|track| track.apple_music_understanding_bpm_octave_aware_absolute_agreement)
+        .collect::<Vec<_>>();
+    let apple_music_understanding_key_matches = tracks
+        .iter()
+        .filter_map(|track| track.apple_music_understanding_exact_key_agreement)
+        .collect::<Vec<_>>();
     let beat_f1_values = tracks
         .iter()
         .filter_map(|track| track.beat_f1)
@@ -937,6 +1034,18 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
         serato_bpm_octave_aware_mean_absolute_agreement: mean_f32(&serato_bpm_octave_errors),
         serato_exact_key_agreement: mean_f32(
             &serato_key_matches
+                .iter()
+                .map(|matches| f32::from(u8::from(*matches)))
+                .collect::<Vec<_>>(),
+        ),
+        apple_music_understanding_bpm_mean_absolute_agreement: mean_f32(
+            &apple_music_understanding_bpm_errors,
+        ),
+        apple_music_understanding_bpm_octave_aware_mean_absolute_agreement: mean_f32(
+            &apple_music_understanding_bpm_octave_errors,
+        ),
+        apple_music_understanding_exact_key_agreement: mean_f32(
+            &apple_music_understanding_key_matches
                 .iter()
                 .map(|matches| f32::from(u8::from(*matches)))
                 .collect::<Vec<_>>(),

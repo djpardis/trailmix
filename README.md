@@ -11,6 +11,10 @@
 normalized mono PCM and returns tempo, musical key, beat positions, and compact
 waveform data. Analysis runs locally.
 
+[Cueport](https://usecueport.com/) plans to use **trail mix** for local waveform
+and audio-analysis features, but the crates are built for any desktop, mobile,
+server, or research tool that needs this function.
+
 ## Structure
 
 - **beat salad** estimates global BPM, beat positions with downbeat inference,

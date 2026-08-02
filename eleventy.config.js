@@ -96,6 +96,9 @@ module.exports = function (eleventyConfig) {
     "brand/illustrations/trail-mix.png": "assets/trail-mix.png",
   });
   eleventyConfig.addPassthroughCopy({
+    "docs/trail-mix-social-card.png": "assets/trail-mix-social-card.png",
+  });
+  eleventyConfig.addPassthroughCopy({
     "docs/beat-salad-card.png": "assets/beat-salad-card.png",
   });
   eleventyConfig.addPassthroughCopy({

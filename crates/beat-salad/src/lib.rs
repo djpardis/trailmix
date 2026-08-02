@@ -271,7 +271,6 @@ struct TempoEstimate {
     confidence: f32,
 }
 
-#[allow(clippy::too_many_lines)]
 fn estimate_tempo(
     onset: &[f32],
     envelope_rate: f32,
@@ -324,7 +323,6 @@ fn estimate_tempo(
     let mut candidates = Vec::with_capacity(max_lag - min_lag + 1);
     for lag in min_lag..=max_lag {
         let mut family_score = base_scores[lag];
-        // Check faster multiples (harmonics)
         for (multiple, weight) in [(2, 0.35), (3, 0.15)] {
             if let Some(family_lag) = lag.checked_mul(multiple)
                 && family_lag <= max_lag
@@ -355,24 +353,14 @@ fn estimate_tempo(
         .max_by(|left, right| left.1.total_cmp(&right.1))?;
     let best_bpm = 60.0 * envelope_rate / best_lag as f32;
 
-    let final_lag = if best_bpm > 160.0 {
-        // Check sub-harmonics: lag * 3/2 (= 2/3 BPM) and lag * 4/3 (= 3/4 BPM)
-        let mut sub_candidate = (best_lag, best_score);
-        for (num, den) in [(3usize, 2usize), (4, 3)] {
-            let sub_lag = best_lag * num / den;
-            if sub_lag >= min_lag && sub_lag <= max_lag {
-                if let Some(&(_, sub_score)) = candidates.iter().find(|(l, _)| *l == sub_lag) {
-                    // Accept the sub-harmonic if it has at least 70% of the best score
-                    if sub_score > best_score * 0.70 && sub_score > sub_candidate.1 * 0.90 {
-                        sub_candidate = (sub_lag, sub_score);
-                    }
-                }
-            }
-        }
-        sub_candidate.0
-    } else {
-        best_lag
-    };
+    let final_lag = resolve_fast_tempo_subharmonic(
+        best_lag,
+        best_score,
+        best_bpm,
+        min_lag,
+        max_lag,
+        &candidates,
+    );
 
     let final_score = candidates
         .iter()
@@ -384,33 +372,86 @@ fn estimate_tempo(
         .map(|(_, score)| *score)
         .fold(0.0_f32, f32::max);
 
+    let period = refined_tempo_period(&interval_histogram, final_lag, min_lag, max_lag);
+    let bpm = (60.0 * envelope_rate / period).clamp(min_bpm, max_bpm);
+    let periodicity = correlations[final_lag.min(correlations.len() - 1)].clamp(0.0, 1.0);
+    let confidence = tempo_confidence(
+        final_score,
+        second_score,
+        periodicity,
+        zero_lag_energy,
+        onset.len(),
+    );
+
+    Some(TempoEstimate { bpm, confidence })
+}
+
+fn resolve_fast_tempo_subharmonic(
+    best_lag: usize,
+    best_score: f32,
+    best_bpm: f32,
+    min_lag: usize,
+    max_lag: usize,
+    candidates: &[(usize, f32)],
+) -> usize {
+    if best_bpm <= 160.0 {
+        return best_lag;
+    }
+
+    let mut sub_candidate = (best_lag, best_score);
+    for (num, den) in [(3usize, 2usize), (4, 3)] {
+        let sub_lag = best_lag * num / den;
+        if sub_lag < min_lag || sub_lag > max_lag {
+            continue;
+        }
+        if let Some(&(_, sub_score)) = candidates.iter().find(|(lag, _)| *lag == sub_lag)
+            && sub_score > best_score * 0.70
+            && sub_score > sub_candidate.1 * 0.90
+        {
+            sub_candidate = (sub_lag, sub_score);
+        }
+    }
+    sub_candidate.0
+}
+
+fn refined_tempo_period(
+    interval_histogram: &[f32],
+    final_lag: usize,
+    min_lag: usize,
+    max_lag: usize,
+) -> f32 {
     let refine_start = final_lag.saturating_sub(1).max(min_lag);
     let refine_end = (final_lag + 1).min(max_lag);
     let refine_weight = interval_histogram[refine_start..=refine_end]
         .iter()
         .sum::<f32>();
-    let period = if refine_weight > f32::EPSILON {
+
+    if refine_weight > f32::EPSILON {
         (refine_start..=refine_end)
             .map(|lag| lag as f32 * interval_histogram[lag])
             .sum::<f32>()
             / refine_weight
     } else {
         final_lag as f32
-    };
-    let bpm = (60.0 * envelope_rate / period).clamp(min_bpm, max_bpm);
-    let periodicity = correlations[final_lag.min(correlations.len() - 1)].clamp(0.0, 1.0);
+    }
+}
+
+fn tempo_confidence(
+    final_score: f32,
+    second_score: f32,
+    periodicity: f32,
+    zero_lag_energy: f32,
+    onset_len: usize,
+) -> f32 {
     let separation = if final_score > f32::EPSILON {
         ((final_score - second_score.max(0.0)) / final_score).clamp(0.0, 1.0)
     } else {
         0.0
     };
-    let activity = (zero_lag_energy / onset.len() as f32).sqrt();
+    let activity = (zero_lag_energy / onset_len as f32).sqrt();
     let activity_gate = (activity * 100.0).clamp(0.0, 1.0);
 
-    Some(TempoEstimate {
-        bpm,
-        confidence: (periodicity * (0.75 + 0.25 * separation) * activity_gate).clamp(0.0, 1.0),
-    })
+    (periodicity * (0.75 + 0.25 * separation) * activity_gate).clamp(0.0, 1.0)
 }
 
 fn onset_interval_histogram(onset: &[f32], min_lag: usize, max_lag: usize) -> Vec<f32> {
@@ -516,7 +557,7 @@ fn estimate_beat_positions(
             let distance = i as f32 - j as f32;
             let deviation = distance - period;
             let penalty = -(deviation * deviation) / (2.0 * penalty_width * penalty_width);
-            let score = *previous_score + penalty.exp() * 0.5;
+            let score = previous_score + penalty.exp() * 0.5;
             if score > best_prev_score {
                 best_prev_score = score;
                 best_prev = j;
