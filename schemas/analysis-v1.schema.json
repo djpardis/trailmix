@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/djpardis/trailmix/schemas/analysis-v1.schema.json",
+  "title": "Trail Mix analysis v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "duration_seconds", "beat", "key", "waveform"],
+  "properties": {
+    "version": { "const": 1 },
+    "duration_seconds": { "type": "number", "minimum": 0 },
+    "beat": { "$ref": "#/$defs/beatAnalysis" },
+    "key": { "$ref": "#/$defs/keyAnalysis" },
+    "waveform": { "$ref": "#/$defs/waveformOverview" }
+  },
+  "$defs": {
+    "beatAnalysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "global_bpm",
+        "confidence",
+        "beats",
+        "tempo_segments",
+        "multi_tempo",
+        "alternate_bpm",
+        "alternate_coverage"
+      ],
+      "properties": {
+        "version": { "const": 3 },
+        "global_bpm": {
+          "anyOf": [{ "type": "number" }, { "type": "null" }]
+        },
+        "confidence": { "type": "number" },
+        "beats": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/beatPosition" }
+        },
+        "tempo_segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tempoSegment" }
+        },
+        "multi_tempo": { "type": "boolean" },
+        "alternate_bpm": {
+          "anyOf": [{ "type": "number" }, { "type": "null" }]
+        },
+        "alternate_coverage": { "type": "number" }
+      }
+    },
+    "beatPosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["time_seconds", "confidence", "position_in_bar"],
+      "properties": {
+        "time_seconds": { "type": "number", "minimum": 0 },
+        "confidence": { "type": "number" },
+        "position_in_bar": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        }
+      }
+    },
+    "tempoSegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_seconds", "end_seconds", "bpm", "confidence"],
+      "properties": {
+        "start_seconds": { "type": "number", "minimum": 0 },
+        "end_seconds": { "type": "number", "minimum": 0 },
+        "bpm": { "type": "number" },
+        "confidence": { "type": "number" }
+      }
+    },
+    "keyAnalysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "key",
+        "confidence",
+        "chroma",
+        "segments",
+        "multi_key",
+        "alternate_key",
+        "alternate_coverage"
+      ],
+      "properties": {
+        "version": { "const": 6 },
+        "key": {
+          "anyOf": [{ "$ref": "#/$defs/musicalKey" }, { "type": "null" }]
+        },
+        "confidence": { "type": "number" },
+        "chroma": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "items": { "type": "number" }
+        },
+        "segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/keySegment" }
+        },
+        "multi_key": { "type": "boolean" },
+        "alternate_key": {
+          "anyOf": [{ "$ref": "#/$defs/musicalKey" }, { "type": "null" }]
+        },
+        "alternate_coverage": { "type": "number" }
+      }
+    },
+    "keySegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_seconds", "end_seconds", "key", "confidence"],
+      "properties": {
+        "start_seconds": { "type": "number", "minimum": 0 },
+        "end_seconds": { "type": "number", "minimum": 0 },
+        "key": { "$ref": "#/$defs/musicalKey" },
+        "confidence": { "type": "number" }
+      }
+    },
+    "musicalKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tonic", "mode"],
+      "properties": {
+        "tonic": { "$ref": "#/$defs/pitchClass" },
+        "mode": { "$ref": "#/$defs/mode" }
+      }
+    },
+    "pitchClass": {
+      "type": "string",
+      "enum": [
+        "C",
+        "CSharp",
+        "D",
+        "DSharp",
+        "E",
+        "F",
+        "FSharp",
+        "G",
+        "GSharp",
+        "A",
+        "ASharp",
+        "B"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["Major", "Minor"]
+    },
+    "waveformOverview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "sample_rate", "source_samples", "columns"],
+      "properties": {
+        "version": { "const": 1 },
+        "sample_rate": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_samples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "columns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/waveformColumn" }
+        }
+      }
+    },
+    "waveformColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "max", "rms"],
+      "properties": {
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "rms": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}
