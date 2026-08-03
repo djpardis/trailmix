@@ -11,7 +11,7 @@
 normalized mono PCM and returns tempo, musical key, beat positions, and compact
 waveform data. Analysis runs locally.
 
-[Cueport](https://usecueport.com/) plans to use **trail mix** for local waveform
+[Cueport](https://usecueport.com/) uses **trail mix** for local waveform
 and audio-analysis features, but the crates are built for any desktop, mobile,
 server, or research tool that needs this function.
 
@@ -59,15 +59,25 @@ versioned analysis results as JSON. CI tests Linux, macOS, and Windows.
 - **Interpretable**: intermediate features (chroma vectors, onset envelopes,
   confidence scores) are exposed, not hidden in a black box.
 
-## Accuracy context
+## Accuracy and tradeoffs
 
-**trail mix** uses heuristic DSP, not trained models. Accuracy is below ML-based
-systems (CNN/transformer SOTA reaches ~73-78% key accuracy on GiantSteps). The
-tradeoff is explicit: lower accuracy in exchange for zero deployment complexity,
-no model downloads, and full algorithmic transparency.
+**trail mix** ships hand-written DSP instead of a trained model. For BPM and
+beats this is competitive. For key estimation, ML systems still lead: CNN and
+transformer models reach roughly 73-78% on the GiantSteps key benchmark.
 
-See [architecture](ARCHITECTURE.md) for algorithm descriptions and design
-rationale.
+The constraint is not model size. Useful key and beat models are only a few
+megabytes. The cost is the inference runtime and its reach. Bundling one adds
+native dependencies and does not cross-compile cleanly to WASM or embedded
+targets, which is where **trail mix** is meant to run.
+
+This tradeoff is deliberate and open to revisit. The roadmap leaves room for an
+optional, feature-gated model backend (for example a pure-Rust inference engine
+that still targets WASM) and for platform-native analysis where it already
+exists, both producing the same `Analysis` result. The zero-dependency DSP core
+stays the default.
+
+The [architecture notes](ARCHITECTURE.md#current-limitations) cover where
+accuracy is weakest today.
 
 ## License
 

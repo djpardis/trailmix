@@ -35,21 +35,15 @@ command-line, and research tools without coupling them to one application.
     goal of lightweight, self-contained DSP. The feature exists so that
     `trailmix-bench` can measure how the heuristic pipeline compares with
     neural approaches on the same corpus.
-- Apple-specific alternative: Apple's Music Understanding framework, introduced
+- Apple comparison reference: Apple's Music Understanding framework, introduced
   at WWDC 2026, provides on-device analysis for key, rhythm, beats, bars, tempo,
   structure, pace, instrument activity, and loudness without requiring an
   application to ship the model. See the
   [Music Understanding documentation](https://developer.apple.com/documentation/musicunderstanding)
   and the [WWDC 2026 presentation](https://developer.apple.com/videos/play/wwdc2026/253/).
-  [Cueport](https://usecueport.com/) is an early planned user, and because it
-  targets Apple devices, an Apple-specific adapter is a reasonable future
-  integration to evaluate separately. Trail Mix itself remains portable across
-  macOS, iOS, Windows, Linux, Android, and WASM. Making an Apple SDK the only
-  backend would prevent local analysis on non-Apple clients, and its internal
-  behavior would not be reproducible from this repository. Applications can
-  choose a native system backend where one exists, serialize those results for
-  sync, and still use Trail Mix elsewhere without presenting the system's work
-  as Trail Mix's contribution.
+  Exported Music Understanding observations may be stored in benchmark manifests
+  for comparison. They are not Trail Mix analysis output. Trail Mix itself
+  remains portable across macOS, iOS, Windows, Linux, Android, and WASM.
 - `key-lime` builds frame-level pitch-class profiles using dual chroma
   extraction (Goertzel + CQT) and classifies key at global and segment levels.
   - Dual chroma extraction: each frame computes chroma via both fixed-window
@@ -133,6 +127,21 @@ old logic and refresh only those rows.
   the corresponding Cargo features are enabled.
 - Confidence values are preliminary and have not been calibrated on held-out
   recordings.
+
+## Roadmap
+
+The DSP core is the portable default, not a fixed ceiling. Areas kept open for
+exploration, each of which must preserve the current `Analysis` result shape:
+
+- An optional, feature-gated model backend for key or beat estimation, using a
+  small quantized model and a pure-Rust inference engine that still targets
+  WASM and embedded builds, so the zero-dependency core stays intact.
+- A platform-native backend where one already exists on device, selected by the
+  application rather than forced by the library.
+- Confidence calibration on held-out recordings so scores can gate UI behavior.
+
+The point of comparison is the benchmark corpus: any backend earns its place by
+measured accuracy against the same references, not by default.
 
 ## References
 

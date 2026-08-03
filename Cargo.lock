@@ -1021,6 +1021,7 @@ dependencies = [
  "key-lime",
  "sampler-platter",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

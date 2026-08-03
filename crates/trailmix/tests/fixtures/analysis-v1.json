@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "duration_seconds": 12.5,
+  "beat": {
+    "version": 3,
+    "global_bpm": 124.0,
+    "confidence": 0.75,
+    "beats": [
+      {
+        "time_seconds": 0.5,
+        "confidence": 0.75,
+        "position_in_bar": 1
+      },
+      {
+        "time_seconds": 0.984,
+        "confidence": 0.5,
+        "position_in_bar": 2
+      }
+    ],
+    "tempo_segments": [
+      {
+        "start_seconds": 0.0,
+        "end_seconds": 12.5,
+        "bpm": 124.0,
+        "confidence": 0.75
+      }
+    ],
+    "multi_tempo": false,
+    "alternate_bpm": null,
+    "alternate_coverage": 0.0
+  },
+  "key": {
+    "version": 6,
+    "key": {
+      "tonic": "A",
+      "mode": "Minor"
+    },
+    "confidence": 0.5,
+    "chroma": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.25,
+      0.0,
+      0.0,
+      0.5,
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    "segments": [
+      {
+        "start_seconds": 0.0,
+        "end_seconds": 12.5,
+        "key": {
+          "tonic": "A",
+          "mode": "Minor"
+        },
+        "confidence": 0.5
+      }
+    ],
+    "multi_key": false,
+    "alternate_key": null,
+    "alternate_coverage": 0.0
+  },
+  "waveform": {
+    "version": 1,
+    "sample_rate": 48000,
+    "source_samples": 600000,
+    "columns": [
+      {
+        "min": -1.0,
+        "max": 1.0,
+        "rms": 0.5
+      },
+      {
+        "min": -0.25,
+        "max": 0.75,
+        "rms": 0.25
+      }
+    ]
+  }
+}
