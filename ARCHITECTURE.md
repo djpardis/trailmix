@@ -1,9 +1,10 @@
 # Architecture
 
-trail mix accepts finite mono `f32` PCM plus a sample rate. Decoding, file
-metadata, databases, application state, and network transport remain caller
-responsibilities. This boundary keeps the analysis crates usable in desktop,
-command-line, and research tools without coupling them to one application.
+**trail mix** is a Rust workspace. Pass an audio file or mono PCM; get tempo, key,
+beat positions, and waveform data as versioned JSON. `beat-salad`, `key-lime`,
+and `sampler-platter` run independently; `trailmix` aggregates their output.
+`trailmix-codecs` handles file decoding and mono prep. Persistence and
+transport are caller responsibilities.
 
 ## Crates
 
@@ -42,7 +43,7 @@ command-line, and research tools without coupling them to one application.
   [Music Understanding documentation](https://developer.apple.com/documentation/musicunderstanding)
   and the [WWDC 2026 presentation](https://developer.apple.com/videos/play/wwdc2026/253/).
   Exported Music Understanding observations may be stored in benchmark manifests
-  for comparison. They are not Trail Mix analysis output. Trail Mix itself
+  for comparison. They are not **trail mix** analysis output. **trail mix** itself
   remains portable across macOS, iOS, Windows, Linux, Android, and WASM.
 - `key-lime` builds frame-level pitch-class profiles using dual chroma
   extraction (Goertzel + CQT) and classifies key at global and segment levels.
@@ -75,8 +76,9 @@ command-line, and research tools without coupling them to one application.
   - Segment-majority voting: global key uses the longest segment's key when
     multiple segments exist.
 - `sampler-platter` bins PCM into min, max, and RMS waveform columns.
-- `trailmix-codecs` provides separately selectable common-format decoders and
-  downmixes decoded channels to mono PCM.
+- `trailmix-codecs` provides separately selectable common-format decoders,
+  downmixes decoded channels to mono PCM, and exposes audio-file analysis
+  helpers.
 - `trailmix-manifest` defines and validates local evaluation-corpus annotations.
 - `trailmix-datasets` imports GiantSteps Tempo v2 and GiantSteps Key reference
   annotations into the shared manifest while retaining dataset provenance.
@@ -86,7 +88,7 @@ command-line, and research tools without coupling them to one application.
 - Benchmark manifests can store external comparison observations separately
   from ground-truth annotations, including Serato metadata and exported Apple
   Music Understanding results. The benchmark reports BPM and key agreement for
-  each reference without treating either system's output as Trail Mix truth.
+  each reference without treating either system's output as **trail mix** truth.
 - `test-kitchen` serves a loopback-only browser interface for playback,
   annotation, Serato observations, and on-demand analysis.
 
@@ -130,8 +132,9 @@ old logic and refresh only those rows.
 
 ## Roadmap
 
-The DSP core is the portable default, not a fixed ceiling. Areas kept open for
-exploration, each of which must preserve the current `Analysis` result shape:
+The DSP core is the portable default, not a fixed ceiling. The following areas
+are kept open for exploration, each required to preserve the current `Analysis`
+result shape.
 
 - An optional, feature-gated model backend for key or beat estimation, using a
   small quantized model and a pure-Rust inference engine that still targets

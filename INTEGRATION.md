@@ -5,13 +5,15 @@ can build against while the analysis algorithms continue to improve.
 
 ## Stability model
 
-Trail Mix is a library-first API. The stable integration boundary is:
+Trail Mix has two integration entry points.
 
-1. Caller provides finite mono `f32` PCM samples and a sample rate.
-2. Caller chooses an `AnalysisConfig`.
-3. Trail Mix returns an `Analysis` value that implements
-   [`serde::Serialize`](https://docs.rs/serde/latest/serde/trait.Serialize.html).
-4. Applications may store or transmit the JSON form of that value.
+1. `trailmix::analyze()` accepts finite mono `f32` PCM plus a sample rate.
+2. `trailmix_codecs::analyze_path()` accepts an audio file. It decodes the file,
+   preps mono PCM, and calls the same analysis core.
+
+Both entry points return an `Analysis` value that implements
+[`serde::Serialize`](https://docs.rs/serde/latest/serde/trait.Serialize.html).
+Applications may store or transmit the JSON form of that value.
 
 The production contract is the versioned JSON shape, not the current internal
 DSP implementation. Algorithm improvements may change estimates and confidence
@@ -26,10 +28,14 @@ Call `trailmix::analyze()` with:
 - `AudioBuffer.sample_rate`: source sample rate in hertz.
 - `AnalysisConfig`: analyzer configuration.
 
-Decoding, channel downmixing, file metadata, persistence, permissions, sync, and
-network transport are caller responsibilities. The optional `trailmix-codecs`
-crate is useful for command-line and desktop tools, but apps may decode with
-platform APIs. The analysis contract starts after decoding.
+File metadata, persistence, permissions, sync, and network transport are caller
+responsibilities. Audio decoding and mono PCM prep can be caller-owned or
+handled by the optional `trailmix-codecs` crate.
+
+To pass an audio file instead, call
+`trailmix_codecs::analyze_path(file, config)`. It decodes MP3, FLAC, AIFF, WAV,
+AAC-in-MP4, and ALAC-in-MP4 when the matching codec features are enabled. It
+then calls `trailmix::analyze()` and returns `Analysis`.
 
 `AnalysisConfig::default()` is the recommended first integration target:
 
@@ -115,15 +121,17 @@ gates.
 
 ## Cueport integration path
 
-The recommended first Cueport integration is a thin Swift/FFI binding that
-accepts mono `Float32` PCM plus a sample rate and returns `Analysis` JSON. This
-keeps the Swift boundary stable while Trail Mix continues to improve internally.
+The stable Cueport integration remains a thin Swift/FFI binding that accepts
+mono `Float32` PCM plus a sample rate and returns `Analysis` JSON. When a Rust
+desktop or server component can give Trail Mix the audio file, it may instead
+call `trailmix_codecs::analyze_path()` and serialize the returned `Analysis` as
+`analysis-v1`.
 
 Cueport should own:
 
-- Audio-file access and decoding.
 - Library scanning and persistence.
 - UI-specific key notation and formatting.
+- Audio decoding when using the PCM entry point.
 
 Trail Mix should own:
 

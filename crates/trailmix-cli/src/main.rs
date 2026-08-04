@@ -1,6 +1,6 @@
 use std::{env, error::Error, process::ExitCode};
 
-use trailmix::{AnalysisConfig, AudioBuffer};
+use trailmix::AnalysisConfig;
 
 fn main() -> ExitCode {
     match run() {
@@ -22,14 +22,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         return Err("usage: trailmix-cli <audio-file>".into());
     }
 
-    let decoded = trailmix_codecs::decode_file(&path)?;
-    let analysis = trailmix::analyze(
-        AudioBuffer {
-            samples: &decoded.samples,
-            sample_rate: decoded.sample_rate,
-        },
-        AnalysisConfig::default(),
-    );
+    let analysis = trailmix_codecs::analyze_path(&path, AnalysisConfig::default())?;
     println!("{}", serde_json::to_string_pretty(&analysis)?);
     Ok(())
 }

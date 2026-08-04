@@ -15,6 +15,7 @@ use symphonia::core::{
     io::{MediaSourceStream, MediaSourceStreamOptions},
     meta::MetadataOptions,
 };
+use trailmix::{Analysis, AnalysisConfig, AudioBuffer};
 
 /// Fully decoded mono PCM and source information.
 #[derive(Debug, Clone, PartialEq)]
@@ -195,21 +196,52 @@ pub fn decode_file(path: impl AsRef<Path>) -> Result<DecodedAudio, DecodeError> 
     })
 }
 
+/// Decode an audio file and run the aggregate trail mix analysis.
+///
+/// This is a convenience wrapper for applications that want the default file
+/// path integration. The core `trailmix` crate still accepts mono finite `f32`
+/// PCM directly via [`trailmix::analyze`].
+///
+/// Enabled formats depend on this crate's Cargo features. `common-codecs`
+/// enables MP3, FLAC, AIFF, WAV, AAC-in-MP4, and ALAC-in-MP4 support.
+///
+/// # Errors
+///
+/// Returns [`DecodeError`] when the file cannot be decoded.
+pub fn analyze_path(
+    path: impl AsRef<Path>,
+    config: AnalysisConfig,
+) -> Result<Analysis, DecodeError> {
+    let decoded = decode_file(path)?;
+    Ok(trailmix::analyze(
+        AudioBuffer {
+            samples: &decoded.samples,
+            sample_rate: decoded.sample_rate,
+        },
+        config,
+    ))
+}
+
 #[cfg(all(test, feature = "wav"))]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use hound::{SampleFormat, WavSpec, WavWriter};
+    use trailmix::AnalysisConfig;
 
     use super::*;
 
-    #[test]
-    fn decodes_stereo_wav_to_mono() {
+    fn temp_wav_path(test_name: &str) -> PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let path = std::env::temp_dir().join(format!("trailmix-codecs-{nonce}.wav"));
+        std::env::temp_dir().join(format!("trailmix-codecs-{test_name}-{nonce}.wav"))
+    }
+
+    #[test]
+    fn decodes_stereo_wav_to_mono() {
+        let path = temp_wav_path("decode-stereo");
         let mut writer = WavWriter::create(
             &path,
             WavSpec {
@@ -234,5 +266,43 @@ mod tests {
         assert_eq!(decoded.samples.len(), 2);
         assert!(decoded.samples[0].abs() < 0.001);
         assert!((decoded.samples[1] - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn analyzes_wav_path() {
+        let sample_rate = 8_000;
+        let path = temp_wav_path("analyze-path");
+        let mut writer = WavWriter::create(
+            &path,
+            WavSpec {
+                channels: 1,
+                sample_rate,
+                bits_per_sample: 16,
+                sample_format: SampleFormat::Int,
+            },
+        )
+        .expect("create WAV");
+        for index in 0..sample_rate {
+            let sample =
+                (2.0 * std::f32::consts::PI * 440.0 * index as f32 / sample_rate as f32).sin();
+            writer
+                .write_sample((sample * f32::from(i16::MAX) * 0.25) as i16)
+                .expect("write sample");
+        }
+        writer.finalize().expect("finalize WAV");
+
+        let analysis = analyze_path(
+            &path,
+            AnalysisConfig {
+                waveform_columns: 64,
+                ..AnalysisConfig::default()
+            },
+        )
+        .expect("analyze WAV");
+        std::fs::remove_file(path).expect("remove WAV");
+
+        assert_eq!(analysis.version, 1);
+        assert!((analysis.duration_seconds - 1.0).abs() < 0.001);
+        assert_eq!(analysis.waveform.columns.len(), 64);
     }
 }

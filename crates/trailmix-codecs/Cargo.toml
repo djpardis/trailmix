@@ -17,6 +17,7 @@ wav = ["symphonia/pcm", "symphonia/wav"]
 
 [dependencies]
 symphonia = { version = "0.6.0", default-features = false }
+trailmix = { path = "../trailmix" }
 
 [lints]
 workspace = true

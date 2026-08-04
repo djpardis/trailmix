@@ -64,6 +64,7 @@ permalink: architecture/index.html
 
     <main class="project-main">
       <div class="container project-layout">
+
         <section class="project-intro" aria-labelledby="architecture-title">
           <div class="intro-copy">
             <p class="eyebrow">Project notes</p>
@@ -73,108 +74,77 @@ permalink: architecture/index.html
           <div class="project-art-spacer" aria-hidden="true"></div>
         </section>
 
-        <section class="component-overview" aria-labelledby="analyzers-title">
-          <div class="section-heading">
-            <h2 id="analyzers-title">Analyzer crates</h2>
-            <p>
-              <strong class="project-name">trail mix</strong> keeps each job separate, then combines the results through
-              the top-level <code>trailmix</code> crate.
-            </p>
-          </div>
+        <section class="project-sections" aria-label="Architecture details">
 
-          <div class="analyzer-grid">
-            <article class="analyzer-card">
-              <img src="/assets/beat-salad-card.png" alt="" class="analyzer-logo" width="96" height="96">
-              <a class="source-icon-link" href="https://github.com/djpardis/trailmix/tree/main/crates/beat-salad" target="_blank" rel="noopener noreferrer" aria-label="open beat salad crate source">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M14 4h6v6"/>
-                  <path d="M10 14 20 4"/>
-                  <path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/>
-                </svg>
-              </a>
-              <div class="analyzer-copy">
-                <h3 class="part-name">beat salad</h3>
-                <p>Estimates global tempo, beat positions, downbeat hints, and local tempo changes.</p>
-                <dl class="analyzer-facts">
-                  <div>
-                    <dt>returns</dt>
-                    <dd>BPM, beat grid, tempo segments</dd>
-                  </div>
-                </dl>
-              </div>
+          <div class="section-stack">
+            <article>
+              <h2>Two entry points</h2>
+              <p>Pass an audio file to <code>trailmix_codecs::analyze_path()</code> and <strong class="project-name">trail mix</strong>
+              handles decoding, mono PCM prep, and analysis. Or supply mono PCM directly to
+              <code>trailmix::analyze()</code> if the app already has it. Both return the same
+              <code>Analysis</code> JSON.</p>
             </article>
-
-            <article class="analyzer-card">
-              <img src="/assets/key-lime-card.png" alt="" class="analyzer-logo" width="96" height="96">
-              <a class="source-icon-link" href="https://github.com/djpardis/trailmix/tree/main/crates/key-lime" target="_blank" rel="noopener noreferrer" aria-label="open key lime crate source">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M14 4h6v6"/>
-                  <path d="M10 14 20 4"/>
-                  <path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/>
-                </svg>
-              </a>
-              <div class="analyzer-copy">
-                <h3 class="part-name">key lime</h3>
-                <p>Builds chroma features and estimates global and local major or minor keys.</p>
-                <dl class="analyzer-facts">
-                  <div>
-                    <dt>returns</dt>
-                    <dd>Key, confidence, key segments</dd>
-                  </div>
-                </dl>
-              </div>
-            </article>
-
-            <article class="analyzer-card">
-              <img src="/assets/sampler-platter-card.png" alt="" class="analyzer-logo" width="96" height="96">
-              <a class="source-icon-link" href="https://github.com/djpardis/trailmix/tree/main/crates/sampler-platter" target="_blank" rel="noopener noreferrer" aria-label="open sampler platter crate source">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M14 4h6v6"/>
-                  <path d="M10 14 20 4"/>
-                  <path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/>
-                </svg>
-              </a>
-              <div class="analyzer-copy">
-                <h3 class="part-name">sampler platter</h3>
-                <p>Condenses audio into compact waveform columns for display and storage.</p>
-                <dl class="analyzer-facts">
-                  <div>
-                    <dt>returns</dt>
-                    <dd>Min, max, and RMS waveform columns</dd>
-                  </div>
-                </dl>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section class="insight-grid" aria-label="Architecture notes">
-          <article>
-            <h2>Why PCM input</h2>
-            <p>
-              <strong class="project-name">trail mix</strong> starts after decoding. An app turns an audio file into
-              mono samples, passes those samples and the sample rate to <strong class="project-name">trail mix</strong>,
-              then stores the returned analysis however it wants.
-            </p>
-          </article>
-          <article>
-            <h2>Tradeoffs</h2>
-            <p>
-              The default analyzers use deterministic DSP rather than bundled
+            <article>
+              <h2>Tradeoffs</h2>
+              <p>The default analyzers use deterministic DSP rather than bundled
               neural-network weights. That keeps the core build small,
               inspectable, and fully offline, but it will not match specialized
-              ML systems on every dataset.
-            </p>
-          </article>
-        </section>
+              ML systems on every dataset.</p>
+            </article>
+            <article aria-labelledby="references-title">
+              <h2 id="references-title">References</h2>
+              {% for section in architecture.sections %}
+                {% if section.slug == "references" %}
+                  <div class="section-content">{{ section.html | safe }}</div>
+                {% endif %}
+              {% endfor %}
+            </article>
+          </div>
 
-        <section class="reference-note" aria-labelledby="references-title">
-          <h2 id="references-title">References</h2>
-          {% for section in architecture.sections %}
-            {% if section.slug == "references" %}
-              <div class="section-content">{{ section.html | safe }}</div>
-            {% endif %}
-          {% endfor %}
+          <div class="arch-crates">
+            <article class="analyzer-card">
+              <img src="/assets/beat-salad-card.png" alt="" class="analyzer-logo" width="80" height="80">
+              <div class="analyzer-card-header">
+                <h3 class="part-name">beat salad</h3>
+                <a class="source-icon-link" href="https://github.com/djpardis/trailmix/tree/main/crates/beat-salad" target="_blank" rel="noopener noreferrer" aria-label="open beat salad crate source">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/></svg>
+                </a>
+              </div>
+              <p>Tempo, beat positions, downbeat hints, local tempo segments.</p>
+              <dl class="analyzer-facts">
+                <div><dt>returns</dt><dd>BPM, beat grid, tempo segments</dd></div>
+              </dl>
+            </article>
+
+            <article class="analyzer-card">
+              <img src="/assets/key-lime-card.png" alt="" class="analyzer-logo" width="80" height="80">
+              <div class="analyzer-card-header">
+                <h3 class="part-name">key lime</h3>
+                <a class="source-icon-link" href="https://github.com/djpardis/trailmix/tree/main/crates/key-lime" target="_blank" rel="noopener noreferrer" aria-label="open key lime crate source">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/></svg>
+                </a>
+              </div>
+              <p>Chroma extraction and global and local key estimation.</p>
+              <dl class="analyzer-facts">
+                <div><dt>returns</dt><dd>Key, confidence, key segments</dd></div>
+              </dl>
+            </article>
+
+            <article class="analyzer-card">
+              <img src="/assets/sampler-platter-card.png" alt="" class="analyzer-logo" width="80" height="80">
+              <div class="analyzer-card-header">
+                <h3 class="part-name">sampler platter</h3>
+                <a class="source-icon-link" href="https://github.com/djpardis/trailmix/tree/main/crates/sampler-platter" target="_blank" rel="noopener noreferrer" aria-label="open sampler platter crate source">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/></svg>
+                </a>
+              </div>
+              <p>Compact min, max, and RMS waveform columns for display.</p>
+              <dl class="analyzer-facts">
+                <div><dt>returns</dt><dd>Min, max, RMS waveform columns</dd></div>
+              </dl>
+            </article>
+          </div>
+
         </section>
       </div>
     </main>
