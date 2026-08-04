@@ -7,13 +7,41 @@
 [![CI](https://github.com/djpardis/trailmix/actions/workflows/ci.yml/badge.svg)](https://github.com/djpardis/trailmix/actions/workflows/ci.yml)
 ![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)
 
-**trail mix** is an offline audio-analysis toolkit written in Rust. It takes
-normalized mono PCM and returns tempo, musical key, beat positions, and compact
-waveform data. Analysis runs locally.
+**trail mix** is an offline audio-analysis toolkit written in Rust. Pass it an
+audio file or mono PCM and it returns tempo, musical key, beat positions, and
+compact waveform data as JSON. Analysis runs locally.
 
 [Cueport](https://usecueport.com/) uses **trail mix** for local waveform
 and audio-analysis features, but the crates are built for any desktop, mobile,
 server, or research tool that needs this function.
+
+## Quick start
+
+**trail mix** requires Rust 1.85 or newer. Run the CLI from the repository root.
+
+```sh
+cargo run -p trailmix-cli -- song.flac
+```
+
+The CLI supports MP3, FLAC, AIFF, WAV, AAC-in-MP4, and ALAC-in-MP4 and prints
+versioned analysis results as JSON. CI tests Linux, macOS, and Windows.
+
+For application code that already has mono PCM, call the core API.
+
+```rust
+let analysis = trailmix::analyze(audio, trailmix::AnalysisConfig::default());
+```
+
+To let Trail Mix open an audio file, call `trailmix_codecs::analyze_path()`. It
+decodes the file, preps mono PCM, and runs analysis.
+
+```rust
+let analysis = trailmix_codecs::analyze_path(
+    "song.m4a",
+    trailmix::AnalysisConfig::default(),
+)?;
+let json = serde_json::to_string(&analysis)?;
+```
 
 ## Structure
 
@@ -27,28 +55,14 @@ server, or research tool that needs this function.
 - **sampler platter** generates compact min/max/RMS waveform columns.
 
 The `trailmix` crate combines the three analyzers behind one PCM-in/results-out
-API. File decoding is kept in the optional `trailmix-codecs` crate.
+API. The optional `trailmix-codecs` crate opens audio files, decodes them, preps
+mono PCM, and runs the same analysis.
 
-Supporting crates:
-
-- `trailmix-cli`: command-line analysis of individual files.
-- `trailmix-bench`: machine-readable benchmark reports (MIREX-weighted key
-  score, beat F1, Serato agreement, timing).
-- `trailmix-manifest`: shared corpus annotation schema.
-- `trailmix-datasets`: imports GiantSteps reference annotations.
-- `test-kitchen`: loopback browser UI for playback, annotation, and on-demand
-  analysis.
-
-## Quick start
-
-**trail mix** requires Rust 1.85 or newer. To try the CLI from the repository root:
-
-```sh
-cargo run -p trailmix-cli -- path/to/audio.flac
-```
-
-The CLI supports MP3, FLAC, AIFF, WAV, AAC-in-MP4, and ALAC-in-MP4 and prints
-versioned analysis results as JSON. CI tests Linux, macOS, and Windows.
+The workspace also includes `trailmix-cli` for command-line use,
+`trailmix-bench` for machine-readable benchmarks, `trailmix-manifest` for the
+corpus annotation schema, `trailmix-datasets` for importing GiantSteps
+reference annotations, and `test-kitchen` as a loopback browser UI for
+playback, annotation, and on-demand analysis.
 
 ## Design principles
 
@@ -59,25 +73,15 @@ versioned analysis results as JSON. CI tests Linux, macOS, and Windows.
 - **Interpretable**: intermediate features (chroma vectors, onset envelopes,
   confidence scores) are exposed, not hidden in a black box.
 
-## Accuracy and tradeoffs
+## Accuracy and next step
 
-**trail mix** ships hand-written DSP instead of a trained model. For BPM and
-beats this is competitive. For key estimation, ML systems still lead: CNN and
-transformer models reach roughly 73-78% on the GiantSteps key benchmark.
+**trail mix** uses lightweight DSP today. It runs locally, stays small, and
+works across targets. BPM, beat, and waveform analysis are useful now. Key
+estimation needs the most improvement.
 
-The constraint is not model size. Useful key and beat models are only a few
-megabytes. The cost is the inference runtime and its reach. Bundling one adds
-native dependencies and does not cross-compile cleanly to WASM or embedded
-targets, which is where **trail mix** is meant to run.
-
-This tradeoff is deliberate and open to revisit. The roadmap leaves room for an
-optional, feature-gated model backend (for example a pure-Rust inference engine
-that still targets WASM) and for platform-native analysis where it already
-exists, both producing the same `Analysis` result. The zero-dependency DSP core
-stays the default.
-
-The [architecture notes](ARCHITECTURE.md#current-limitations) cover where
-accuracy is weakest today.
+The next step is optional model-based or platform-native analysis that returns
+the same `Analysis` JSON. The DSP core stays the default for apps that need
+local, small, dependency-light analysis.
 
 ## License
 
