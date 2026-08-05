@@ -119,6 +119,9 @@ module.exports = function (eleventyConfig) {
   eleventyConfig.addWatchTarget("README.md");
   eleventyConfig.addWatchTarget("ARCHITECTURE.md");
 
+  eleventyConfig.addGlobalData("assetVersion", () => Date.now());
+  eleventyConfig.addGlobalData("year", () => new Date().getFullYear());
+
   eleventyConfig.addGlobalData("readme", () => {
     const source = fs.readFileSync(readmePath, "utf8");
     const tokens = markdown.parse(source, {});

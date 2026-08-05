@@ -1,9 +1,10 @@
 # Architecture
 
-**trail mix** is a Rust workspace. Pass an audio file or mono PCM; get tempo, key,
-beat positions, and waveform data as versioned JSON. `beat-salad`, `key-lime`,
-and `sampler-platter` run independently; `trailmix` aggregates their output.
-`trailmix-codecs` handles file decoding and mono prep. Persistence and
+**trail mix** is a Rust workspace. It accepts an audio file or mono PCM and returns
+tempo, key, beat positions, and waveform data as versioned JSON. `beat-salad`,
+`key-lime`, and `sampler-platter` are independent crates that can be used on their
+own. `trailmix` is an optional facade that runs all three and returns one combined
+result. `trailmix-codecs` handles file decoding and mono prep. Persistence and
 transport are caller responsibilities.
 
 ## Crates
@@ -138,7 +139,7 @@ result shape.
 
 - An optional, feature-gated model backend for key or beat estimation, using a
   small quantized model and a pure-Rust inference engine that still targets
-  WASM and embedded builds, so the zero-dependency core stays intact.
+  WASM and embedded builds, so the zero-dependency core remains intact.
 - A platform-native backend where one already exists on device, selected by the
   application rather than forced by the library.
 - Confidence calibration on held-out recordings so scores can gate UI behavior.

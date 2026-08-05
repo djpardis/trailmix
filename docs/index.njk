@@ -28,7 +28,7 @@ permalink: index.html
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=DM+Sans:wght@400;500;600;700&amp;display=swap"
     >
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css?v={{ assetVersion }}">
   </head>
   <body>
     <header class="site-header">
@@ -63,9 +63,11 @@ permalink: index.html
     </header>
 
     <main class="project-main">
-      <div class="container project-layout">
-        <section class="project-intro home-intro" aria-labelledby="project-title">
-          <div class="intro-copy">
+      <div class="project-grid">
+
+        <div class="col-main">
+
+          <section aria-labelledby="project-title">
             <p class="eyebrow">tempo · key · waveform</p>
             <h1 id="project-title">{{ readme.title }}</h1>
             <div class="intro-body">
@@ -76,19 +78,32 @@ permalink: index.html
                 alt="An illustrated mix of nuts, seeds, raisins, and chocolate"
               >
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="project-sections" aria-label="Project details">
           {% for section in readme.sections %}
-            {% if section.slug != "license" %}
+            {% if section.slug == "quick-start" %}
               <article id="{{ section.slug }}">
                 <h2>{{ section.title }}</h2>
                 <div class="section-content">{{ section.html | safe }}</div>
               </article>
             {% endif %}
           {% endfor %}
-        </section>
+
+        </div>
+
+        <div class="col-side">
+
+          {% for section in readme.sections %}
+            {% if section.slug == "design-principles" or section.slug == "accuracy-and-next-step" %}
+              <article id="{{ section.slug }}">
+                <h2>{{ section.title }}</h2>
+                <div class="section-content">{{ section.html | safe }}</div>
+              </article>
+            {% endif %}
+          {% endfor %}
+
+        </div>
+
       </div>
     </main>
 
@@ -99,6 +114,7 @@ permalink: index.html
             <div class="footer-license">{{ section.firstSentenceHtml | safe }}</div>
           {% endif %}
         {% endfor %}
+        <p class="footer-copyright">&copy; {{ year }} trail mix contributors</p>
       </div>
     </footer>
   </body>

@@ -7,40 +7,40 @@
 [![CI](https://github.com/djpardis/trailmix/actions/workflows/ci.yml/badge.svg)](https://github.com/djpardis/trailmix/actions/workflows/ci.yml)
 ![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)
 
-**trail mix** is an offline audio-analysis toolkit written in Rust. Pass it an
-audio file or mono PCM and it returns tempo, musical key, beat positions, and
+**trail mix** is an offline audio-analysis toolkit written in Rust. It accepts an
+audio file or mono PCM and returns tempo, musical key, beat positions, and
 compact waveform data as JSON. Analysis runs locally.
 
 [Cueport](https://usecueport.com/) uses **trail mix** for local waveform
 and audio-analysis features, but the crates are built for any desktop, mobile,
-server, or research tool that needs this function.
+server, or research tool that needs local tempo, key, and waveform analysis.
 
 ## Quick start
 
 **trail mix** requires Rust 1.85 or newer. Run the CLI from the repository root.
 
 ```sh
-cargo run -p trailmix-cli -- song.flac
+cargo run -p trailmix-cli -- song.mp3
 ```
 
 The CLI supports MP3, FLAC, AIFF, WAV, AAC-in-MP4, and ALAC-in-MP4 and prints
 versioned analysis results as JSON. CI tests Linux, macOS, and Windows.
 
-For application code that already has mono PCM, call the core API.
-
-```rust
-let analysis = trailmix::analyze(audio, trailmix::AnalysisConfig::default());
-```
-
-To let Trail Mix open an audio file, call `trailmix_codecs::analyze_path()`. It
-decodes the file, preps mono PCM, and runs analysis.
+`trailmix_codecs::analyze_path()` accepts an audio file and handles decoding,
+mono PCM prep, and analysis.
 
 ```rust
 let analysis = trailmix_codecs::analyze_path(
-    "song.m4a",
+    "song.mp3",
     trailmix::AnalysisConfig::default(),
 )?;
 let json = serde_json::to_string(&analysis)?;
+```
+
+When the application already has mono PCM, call the core API directly.
+
+```rust
+let analysis = trailmix::analyze(audio, trailmix::AnalysisConfig::default());
 ```
 
 ## Structure
@@ -75,12 +75,12 @@ playback, annotation, and on-demand analysis.
 
 ## Accuracy and next step
 
-**trail mix** uses lightweight DSP today. It runs locally, stays small, and
+**trail mix** uses lightweight DSP today. It runs locally, remains small, and
 works across targets. BPM, beat, and waveform analysis are useful now. Key
 estimation needs the most improvement.
 
 The next step is optional model-based or platform-native analysis that returns
-the same `Analysis` JSON. The DSP core stays the default for apps that need
+the same `Analysis` JSON. The DSP core remains the default for apps that need
 local, small, dependency-light analysis.
 
 ## License
