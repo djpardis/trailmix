@@ -7,9 +7,9 @@
 [![CI](https://github.com/djpardis/trailmix/actions/workflows/ci.yml/badge.svg)](https://github.com/djpardis/trailmix/actions/workflows/ci.yml)
 ![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)
 
-**trail mix** is an offline audio-analysis toolkit written in Rust. It accepts an
+**trail mix** is an audio-analysis toolkit written in Rust. It accepts an
 audio file or mono PCM and returns tempo, musical key, beat positions, and
-compact waveform data as JSON. Analysis runs locally.
+compact waveform data as JSON.
 
 [Cueport](https://usecueport.com/) uses **trail mix** for local waveform
 and audio-analysis features, but the crates are built for any desktop, mobile,
@@ -66,16 +66,15 @@ playback, annotation, and on-demand analysis.
 
 ## Design principles
 
-- **Pure Rust, zero ML dependencies**: all analysis is deterministic DSP.
+- **Pure Rust**: all analysis is deterministic DSP.
 - **Small binary**: all three analyzers fit in under 3 MB.
-- **Portable**: runs on ARM, x86, and WASM without platform-specific
-  inference machinery.
+- **Portable**: runs on ARM, x86, and WASM.
 - **Interpretable**: intermediate features (chroma vectors, onset envelopes,
-  confidence scores) are exposed, not hidden in a black box.
+  confidence scores) are exposed.
 
 ## Accuracy and next step
 
-**trail mix** uses lightweight DSP today. It runs locally, remains small, and
+**trail mix** uses lightweight DSP. It runs locally, remains small, and
 works across targets. BPM, beat, and waveform analysis are useful now. Key
 estimation needs the most improvement.
 
