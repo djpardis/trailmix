@@ -64,7 +64,6 @@ svg {
 }
 
 code,
-.eyebrow,
 .header-badge {
   font-family: var(--font-mono);
 }
@@ -234,12 +233,7 @@ code,
 /* ── Typography ──────────────────────────────────────────────── */
 
 .eyebrow {
-  margin: 0 0 12px;
-  color: var(--cranberry);
-  font-size: var(--type-meta);
-  font-weight: 500;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  display: none;
 }
 
 h1,
