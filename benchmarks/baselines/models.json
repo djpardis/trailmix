@@ -1,0 +1,63 @@
+{
+  "version": 2,
+  "models": {
+    "skey": {
+      "source_repository": "https://github.com/deezer/s-key",
+      "source_revision": "918b83d273568d5041569bb8068843d19a335726",
+      "package_version": "0.1.0",
+      "artifact_path_at_revision": "skey/models/skey.pt",
+      "artifact_sha256": "78dfd0ad4fa9434bf7cec70a25934b7c575bda9c80e994700140770ad3a5ead4",
+      "artifact_size_bytes": 765465,
+      "code_license": "MIT",
+      "weight_license": "MIT as declared by the source repository",
+      "training_disclosure": [
+        "The S-KEY paper reports self-supervised variants trained on 60,000 and 1,000,000 songs from the Deezer catalog.",
+        "The distributed checkpoint does not identify its exact training corpus in checkpoint metadata.",
+        "The large training corpus is not publicly reproducible."
+      ],
+      "benchmark_configuration": {
+        "device": "CPU",
+        "sample_rate_hz": 22050,
+        "segment_aggregation": "Official full-track inference",
+        "output": "One of 24 major or minor keys"
+      }
+    },
+    "beat-this-final0": {
+      "source_repository": "https://github.com/CPJKU/beat_this",
+      "source_release": "v1.1.0",
+      "source_revision": "ad7974846029835307ba19a3d5cefbf40b243041",
+      "package_version": "1.1.0",
+      "artifact_url": "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/final0.ckpt",
+      "artifact_sha256": "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331",
+      "artifact_size_bytes": 81058141,
+      "code_license": "MIT",
+      "weight_license": "MIT as declared by the source repository",
+      "training_disclosure": [
+        "The final0 checkpoint was trained on the authors' combined data except GTZAN.",
+        "The authors warn that some training files are copyrighted or use limited Creative Commons licenses.",
+        "The source repository must be consulted before redistribution or commercial use."
+      ],
+      "benchmark_configuration": {
+        "device": "CPU",
+        "postprocessor": "Minimal, without DBN",
+        "tempo_conversion": "60 divided by the median predicted beat interval between 0.25 and 2.0 seconds",
+        "output": "Beat and downbeat timestamps plus derived global tempo"
+      }
+    }
+  },
+  "excluded_models": {
+    "keymyna": {
+      "source_repository": "https://github.com/echo-cipher/keymyna",
+      "source_revision": "7d590820dd93b3adb45be12ebe991b414ae53683",
+      "base_model_repository": "https://github.com/ghost-signal/myna",
+      "base_model_revision": "4fed3d3d064be32b0134ab432bcccfe5d245e27e",
+      "code_license": "No license file or GitHub-detected license at the audited revisions",
+      "weight_license": "No explicit license found for the Myna-Vertical checkpoint or KeyMyna heads",
+      "reported_giantsteps_result": {
+        "mirex_weighted_score": 0.7591,
+        "exact_accuracy": 0.7202
+      },
+      "exclusion_reason": "Do not download, benchmark, redistribute, or ship until the authors publish explicit code and weight licenses."
+    }
+  }
+}

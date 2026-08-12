@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Test Kitchen</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">trail mix research tools</p>
+        <h1>Test Kitchen</h1>
+      </div>
+      <div id="save-status" role="status">Loading manifest</div>
+    </header>
+
+    <div class="layout">
+      <aside>
+        <div class="aside-heading">
+          <h2>Tracks</h2>
+          <button id="show-add-track" class="secondary">Add</button>
+        </div>
+        <form id="add-track-form" class="hidden panel">
+          <label>
+            Track ID
+            <input id="new-track-id" required placeholder="gone-gone-thank-you">
+          </label>
+          <label>
+            Audio path
+            <input id="new-track-path" required placeholder="local/song.flac">
+          </label>
+          <div class="button-row">
+            <button type="submit">Create track</button>
+            <button type="button" id="cancel-add-track" class="secondary">Cancel</button>
+          </div>
+        </form>
+        <nav id="track-list" aria-label="Benchmark tracks"></nav>
+      </aside>
+
+      <main id="empty-state">
+        <section class="empty">
+          <h2>Select or add a track</h2>
+          <p>Annotations are saved directly to the private manifest.</p>
+        </section>
+      </main>
+
+      <main id="editor" class="hidden">
+        <section class="hero panel">
+          <div>
+            <p class="eyebrow">Current track</p>
+            <h2 id="track-title"></h2>
+            <p id="track-path" class="muted"></p>
+          </div>
+          <div class="button-row">
+            <button id="save-track">Save annotation</button>
+            <button id="delete-track" class="danger">Delete</button>
+          </div>
+        </section>
+
+        <section class="panel player-panel">
+          <audio id="audio-player" controls preload="metadata"></audio>
+          <div class="transport-tools">
+            <span>Position: <strong id="current-time">0:00.000</strong></span>
+            <button id="tap-tempo" class="accent">Tap tempo</button>
+            <span id="tap-result">Tap at least twice</span>
+            <button id="use-tap-tempo" class="secondary" disabled>Use tapped BPM</button>
+          </div>
+        </section>
+
+        <section class="grid two">
+          <div class="panel">
+            <div class="section-heading">
+              <h3>Reference summary</h3>
+              <span class="help">The reviewed answer</span>
+            </div>
+            <label>
+              Global BPM
+              <input id="expected-bpm" type="number" min="1" step="0.001">
+            </label>
+            <label>
+              Global key
+              <input id="expected-key" placeholder="B♭ major">
+            </label>
+            <label>
+              Split
+              <select id="split">
+                <option value="">Unassigned</option>
+                <option value="tuning">Tuning</option>
+                <option value="evaluation">Held-out evaluation</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="panel">
+            <div class="section-heading">
+              <h3>Serato observation</h3>
+              <span class="help">Comparison, not ground truth</span>
+            </div>
+            <label>
+              Serato BPM
+              <input id="serato-bpm" type="number" min="1" step="0.001">
+            </label>
+            <label>
+              Serato key
+              <input id="serato-key">
+            </label>
+            <div class="check-row">
+              <label><input id="serato-bpm-edited" type="checkbox"> BPM was edited</label>
+              <label><input id="serato-key-edited" type="checkbox"> Key was edited</label>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <h3>trail mix prediction</h3>
+              <p class="muted">Run the current analyzers without changing the reference annotation.</p>
+            </div>
+            <button id="run-analysis">Analyze track</button>
+          </div>
+          <div id="analysis-result" class="analysis-result muted">Not analyzed in this session.</div>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <h3>Beat-switch events</h3>
+              <p class="muted">One boundary may change structure, tempo, and key together.</p>
+            </div>
+            <button id="add-change-event">Add at current position</button>
+          </div>
+          <div id="change-events" class="rows"></div>
+        </section>
+
+        <section class="grid two">
+          <div class="panel">
+            <div class="section-heading">
+              <h3>Tempo segments</h3>
+              <button id="add-tempo-segment" class="secondary">Add at position</button>
+            </div>
+            <div id="tempo-segments" class="rows"></div>
+          </div>
+
+          <div class="panel">
+            <div class="section-heading">
+              <h3>Key segments</h3>
+              <button id="add-key-segment" class="secondary">Add at position</button>
+            </div>
+            <div id="key-segments" class="rows"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <h3>Reference beats</h3>
+              <p class="muted">Add individual beats when validating grid continuity.</p>
+            </div>
+            <button id="add-beat" class="secondary">Add beat at position</button>
+          </div>
+          <div id="beat-list" class="chip-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="grid three">
+            <label>
+              Annotation status
+              <select id="annotation-status">
+                <option value="draft">Draft</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="adjudicated">Adjudicated</option>
+              </select>
+            </label>
+            <label>
+              Reviewer
+              <input id="reviewer">
+            </label>
+            <label>
+              Confidence
+              <input id="annotation-confidence" type="number" min="0" max="1" step="0.05">
+            </label>
+          </div>
+          <label>
+            Notes
+            <textarea id="notes" rows="4"></textarea>
+          </label>
+        </section>
+      </main>
+    </div>
+
+    <template id="change-event-template">
+      <div class="row change-row">
+        <label>Time <input data-field="time" type="number" min="0" step="0.001"></label>
+        <label>Label <input data-field="label" placeholder="THANK YOU begins"></label>
+        <div class="check-row">
+          <label><input data-field="structure" type="checkbox"> Structure</label>
+          <label><input data-field="tempo" type="checkbox"> Tempo</label>
+          <label><input data-field="key" type="checkbox"> Key</label>
+        </div>
+        <button data-action="remove-row" class="icon danger" aria-label="Remove event">Remove</button>
+      </div>
+    </template>
+
+    <template id="tempo-segment-template">
+      <div class="row segment-row">
+        <label>Start <input data-field="start" type="number" min="0" step="0.001"></label>
+        <label>End <input data-field="end" type="number" min="0" step="0.001"></label>
+        <label>BPM <input data-field="bpm" type="number" min="1" step="0.001"></label>
+        <label>End BPM <input data-field="end-bpm" type="number" min="1" step="0.001"></label>
+        <button data-action="remove-row" class="icon danger" aria-label="Remove segment">Remove</button>
+      </div>
+    </template>
+
+    <template id="key-segment-template">
+      <div class="row segment-row">
+        <label>Start <input data-field="start" type="number" min="0" step="0.001"></label>
+        <label>End <input data-field="end" type="number" min="0" step="0.001"></label>
+        <label>Key <input data-field="key" placeholder="D♭ major"></label>
+        <button data-action="remove-row" class="icon danger" aria-label="Remove segment">Remove</button>
+      </div>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

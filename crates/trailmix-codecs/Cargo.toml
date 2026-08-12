@@ -1,0 +1,26 @@
+[package]
+name = "trailmix-codecs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+common-codecs = ["aiff", "flac", "mp3", "mp4", "wav"]
+aiff = ["symphonia/aiff", "symphonia/pcm"]
+flac = ["symphonia/flac"]
+mp3 = ["symphonia/mp3"]
+mp4 = ["symphonia/aac", "symphonia/alac", "symphonia/isomp4"]
+wav = ["symphonia/pcm", "symphonia/wav"]
+
+[dependencies]
+symphonia = { version = "0.6.0", default-features = false }
+trailmix = { path = "../trailmix" }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+hound = "3.5.1"

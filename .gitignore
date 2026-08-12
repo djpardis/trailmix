@@ -1,0 +1,16 @@
+/target/
+*.wav
+*.aiff
+*.aif
+*.flac
+*.mp3
+*.m4a
+*.ogg
+/benchmarks/local/
+/benchmarks/*.private.json
+/benchmarks/baselines/.venv/
+__pycache__/
+*.py[cod]
+/benchmark-results/
+/node_modules/
+/_site/

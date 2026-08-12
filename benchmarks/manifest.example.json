@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "tracks": [
+    {
+      "id": "constant-tempo-example",
+      "path": "local/constant-tempo-example.flac",
+      "split": "evaluation",
+      "source": {
+        "name": "Example dataset",
+        "version": "1",
+        "item_id": "constant-tempo-example",
+        "citation": "Example citation"
+      },
+      "expected_bpm": 128.0,
+      "expected_key": "A minor",
+      "serato": {
+        "bpm": 128.0,
+        "key": "8A",
+        "bpm_user_edited": false,
+        "key_user_edited": false
+      },
+      "annotation": {
+        "status": "reviewed",
+        "reviewer": "example-reviewer",
+        "confidence": 1.0
+      }
+    },
+    {
+      "id": "tempo-change-example",
+      "path": "local/tempo-change-example.wav",
+      "split": "evaluation",
+      "expected_tempo_segments": [
+        {
+          "start_seconds": 0.0,
+          "end_seconds": 45.0,
+          "bpm": 100.0
+        },
+        {
+          "start_seconds": 45.0,
+          "end_seconds": 90.0,
+          "bpm": 120.0
+        }
+      ],
+      "expected_key_segments": [
+        {
+          "start_seconds": 0.0,
+          "end_seconds": 45.0,
+          "key": "B♭ major"
+        },
+        {
+          "start_seconds": 45.0,
+          "end_seconds": 90.0,
+          "key": "D♭ major"
+        }
+      ],
+      "change_events": [
+        {
+          "time_seconds": 45.0,
+          "structure_changed": true,
+          "tempo_changed": true,
+          "key_changed": true,
+          "label": "Beat switch"
+        }
+      ],
+      "annotation": {
+        "status": "draft"
+      }
+    }
+  ]
+}

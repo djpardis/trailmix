@@ -1,0 +1,8 @@
+{
+  "configuration_sha256": "40adfb263d6ce69842614d0c01ba178241d54cc595ffa57fdb81d26f14601ad0",
+  "corpus_name": "FMAKv2 1000-track external validation",
+  "corpus_sha256": "43a35a0b655272e916bf4f03f3a195a7cd524a2fdb8126ef45e0ebadcafec863",
+  "sealed_at": "2026-07-29T05:23:02.425790+00:00",
+  "track_count": 1000,
+  "version": 1
+}

@@ -1,0 +1,8 @@
+{
+  "configuration_sha256": "40adfb263d6ce69842614d0c01ba178241d54cc595ffa57fdb81d26f14601ad0",
+  "corpus_name": "FSL10K 1000-loop consensus external validation",
+  "corpus_sha256": "0c7a7ee96aab335d773b86cf0708cf11457780a4340387ab5b63f7512a0a70ec",
+  "sealed_at": "2026-07-29T05:23:02.467497+00:00",
+  "track_count": 1000,
+  "version": 1
+}

@@ -1,0 +1,171 @@
+---
+permalink: architecture/index.html
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ architecture.title }} | trail mix</title>
+    <meta name="description" content="{{ architecture.description }}">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="canonical" href="https://trailmix.tools/architecture/">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="{{ architecture.title }} | trail mix">
+    <meta property="og:description" content="{{ architecture.description }}">
+    <meta property="og:url" content="https://trailmix.tools/architecture/">
+    <meta property="og:image" content="https://trailmix.tools/assets/trail-mix-social-card.png?v=1">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://trailmix.tools/assets/trail-mix-social-card.png?v=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&amp;family=DM+Sans:wght@400;500;600;700&amp;display=swap"
+    >
+    <link rel="stylesheet" href="/styles.css?v={{ assetVersion }}">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="logo-lockup" href="/">
+          <img
+            class="brand-mark"
+            src="/assets/trail-mix.png?v=3"
+            alt="trail mix"
+          >
+          <span class="brand-title">trail mix</span>
+          <span class="header-badge">Rust</span>
+        </a>
+        <nav class="site-nav" aria-label="Project links">
+          <a class="nav-link architecture-link" href="/architecture/" aria-label="Architecture">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 5h6v6H5z"/>
+              <path d="M13 5h6v6h-6z"/>
+              <path d="M5 13h6v6H5z"/>
+              <path d="M13 13h6v6h-6z"/>
+            </svg>
+            <span>Architecture</span>
+          </a>
+          <a class="repository-link" href="https://github.com/djpardis/trailmix" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2C6.48 2 2 6.6 2 12.26c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49v-1.92c-2.78.62-3.37-1.21-3.37-1.21-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.86.09-.66.35-1.12.64-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.04 1.03-2.76-.1-.26-.45-1.3.1-2.72 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.99a9.3 9.3 0 0 1 2.5.35c1.91-1.33 2.75-1.05 2.75-1.05.55 1.42.2 2.46.1 2.72.64.72 1.03 1.64 1.03 2.76 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9v2.77c0 .27.18.59.69.49A10.26 10.26 0 0 0 22 12.26C22 6.6 17.52 2 12 2Z"/>
+            </svg>
+            <span>Source</span>
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="project-main">
+      <div class="project-grid">
+
+        <div class="col-main">
+
+          <section aria-labelledby="architecture-title">
+            <h1 id="architecture-title">{{ architecture.title }}</h1>
+            <div class="intro-text">{{ architecture.introHtml | safe }}</div>
+          </section>
+
+          <article>
+            <h2>Two entry points</h2>
+            <p><code>trailmix_codecs::analyze_path()</code> accepts an audio file and handles decoding, mono PCM prep, and analysis.
+            <code>trailmix::analyze()</code> accepts mono PCM directly.
+            Both return the same <code>Analysis</code> JSON.</p>
+          </article>
+
+          <article>
+            <h2>Tradeoffs</h2>
+            <p>The default analyzers use deterministic DSP rather than bundled
+            neural-network weights. The core build remains small,
+            inspectable, and fully offline, but will not match specialized
+            ML systems on every dataset.</p>
+          </article>
+
+          <article aria-labelledby="references-title">
+            <h2 id="references-title">References</h2>
+            {% for section in architecture.sections %}
+              {% if section.slug == "references" %}
+                <div class="section-content">{{ section.html | safe }}</div>
+              {% endif %}
+            {% endfor %}
+          </article>
+
+        </div>
+
+        <div class="col-side" aria-labelledby="analyzers-title">
+
+          <div class="col-side-intro">
+            <h2 id="analyzers-title">Analyzer crates</h2>
+            <p>Each crate performs one analysis task and can be used on its own.
+            The <strong class="project-name">trail mix</strong> facade runs all
+            three and returns one combined result.</p>
+          </div>
+
+          <article class="analyzer-card">
+            <img src="/assets/beat-salad-card.png" alt="" class="analyzer-logo" width="80" height="80">
+            <h3 class="part-name">
+              <a class="crate-link" href="https://github.com/djpardis/trailmix/tree/main/crates/beat-salad" target="_blank" rel="noopener noreferrer">
+                beat salad
+                <svg class="crate-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/></svg>
+              </a>
+            </h3>
+            <p>Estimates global BPM, beat positions with downbeat inference, and
+            local tempo segments using autocorrelation with harmonic scoring and
+            a gentle octave prior.</p>
+            <dl class="analyzer-facts">
+              <div><dt>returns</dt><dd>BPM, beat grid, tempo segments</dd></div>
+            </dl>
+          </article>
+
+          <article class="analyzer-card">
+            <img src="/assets/key-lime-card.png" alt="" class="analyzer-logo" width="80" height="80">
+            <h3 class="part-name">
+              <a class="crate-link" href="https://github.com/djpardis/trailmix/tree/main/crates/key-lime" target="_blank" rel="noopener noreferrer">
+                key lime
+                <svg class="crate-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/></svg>
+              </a>
+            </h3>
+            <p>Estimates global and local major or minor keys with dual chroma
+            extraction, multiple key profiles, median aggregation, and
+            confidence-gated segmentation.</p>
+            <dl class="analyzer-facts">
+              <div><dt>returns</dt><dd>Key, confidence, key segments</dd></div>
+            </dl>
+          </article>
+
+          <article class="analyzer-card">
+            <img src="/assets/sampler-platter-card.png" alt="" class="analyzer-logo" width="80" height="80">
+            <h3 class="part-name">
+              <a class="crate-link" href="https://github.com/djpardis/trailmix/tree/main/crates/sampler-platter" target="_blank" rel="noopener noreferrer">
+                sampler platter
+                <svg class="crate-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/></svg>
+              </a>
+            </h3>
+            <p>Generates compact min, max, and RMS waveform columns for display.</p>
+            <dl class="analyzer-facts">
+              <div><dt>returns</dt><dd>Min, max, RMS waveform columns</dd></div>
+            </dl>
+          </article>
+
+        </div>
+
+      </div>
+    </main>
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        {% for section in readme.sections %}
+          {% if section.slug == "license" %}
+            <div class="footer-license">{{ section.firstSentenceHtml | safe }}</div>
+          {% endif %}
+        {% endfor %}
+        <p class="footer-copyright">&copy; {{ year }} trail mix</p>
+      </div>
+    </footer>
+  </body>
+</html>
