@@ -11,6 +11,9 @@ pub struct WaveformColumn {
     pub max: f32,
     /// Root mean square energy in the column.
     pub rms: f32,
+    /// Display-oriented waveform height after track-level normalization.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_height: Option<f32>,
     /// Approximate spectral balance, where 0 is bass-heavy and 1 is treble-heavy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spectral_centroid: Option<f32>,
@@ -81,9 +84,12 @@ pub fn generate_overview(
             min,
             max,
             rms: (sum_squares / window.len() as f64).sqrt() as f32,
+            display_height: None,
             spectral_centroid: Some(spectral_balance(window)),
         });
     }
+
+    apply_display_heights(&mut columns);
 
     WaveformOverview {
         version: 1,
@@ -91,6 +97,48 @@ pub fn generate_overview(
         source_samples: samples.len(),
         columns,
     }
+}
+
+fn apply_display_heights(columns: &mut [WaveformColumn]) {
+    let energies = columns
+        .iter()
+        .map(|column| {
+            let peak = column.min.abs().max(column.max.abs());
+            // RMS tracks perceived body, while peak keeps transients visible.
+            column.rms.mul_add(0.65, peak * 0.35)
+        })
+        .collect::<Vec<_>>();
+
+    let max_energy = energies.iter().copied().fold(0.0_f32, f32::max);
+    if max_energy <= f32::EPSILON {
+        for column in columns {
+            column.display_height = Some(0.0);
+        }
+        return;
+    }
+
+    let noise_floor = percentile(energies.clone(), 0.10) * 0.5;
+    let display_ceiling = percentile(energies.clone(), 0.95).max(max_energy * 0.5);
+    let range = (display_ceiling - noise_floor).max(max_energy * 0.05);
+
+    for (column, energy) in columns.iter_mut().zip(energies) {
+        let normalized = ((energy - noise_floor) / range).clamp(0.0, 1.0);
+        let compressed = normalized.powf(0.42);
+        column.display_height = Some(if energy > f32::EPSILON {
+            compressed.max(0.06)
+        } else {
+            0.0
+        });
+    }
+}
+
+fn percentile(mut values: Vec<f32>, p: f32) -> f32 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.sort_by(f32::total_cmp);
+    let idx = ((values.len() - 1) as f32 * p.clamp(0.0, 1.0)).round() as usize;
+    values[idx]
 }
 
 fn spectral_balance(window: &[f32]) -> f32 {
@@ -158,9 +206,21 @@ mod tests {
                 min: 0.0,
                 max: 0.0,
                 rms: 0.0,
+                display_height: Some(0.0),
                 spectral_centroid: Some(0.5),
             }
         );
+    }
+
+    #[test]
+    fn display_height_boosts_quiet_columns_without_clipping_loud_columns() {
+        let overview = generate_overview(&[-0.02, 0.02, -1.0, 1.0], 4, 2);
+        let quiet = overview.columns[0].display_height.unwrap();
+        let loud = overview.columns[1].display_height.unwrap();
+
+        assert!(quiet > 0.02);
+        assert!(quiet < loud);
+        assert!(loud <= 1.0);
     }
 
     #[test]

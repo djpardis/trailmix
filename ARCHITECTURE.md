@@ -75,7 +75,8 @@ result. `trailmix-codecs` handles file decoding and mono prep.
     do not create segment boundaries; short segments merge into neighbors.
   - Segment-majority voting: global key uses the longest segment's key when
     multiple segments exist.
-- `sampler-platter` bins PCM into min, max, and RMS waveform columns.
+- `sampler-platter` bins PCM into waveform columns with raw min, max, and RMS
+  values plus display-oriented height and spectral color hints.
 - `trailmix-codecs` provides separately selectable common-format decoders,
   downmixes decoded channels to mono PCM, and exposes audio-file analysis
   helpers.

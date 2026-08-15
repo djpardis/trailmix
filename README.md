@@ -52,7 +52,8 @@ let analysis = trailmix::analyze(audio, trailmix::AnalysisConfig::default());
   extraction (Goertzel + Constant-Q Transform), multiple key profiles
   (Krumhansl-Kessler, Temperley, EDMA, and learned), median aggregation, and
   confidence-gated segmentation.
-- **sampler platter** generates compact min/max/RMS waveform columns.
+- **sampler platter** generates compact waveform columns with raw min/max/RMS
+  values plus optional display height and spectral color hints.
 
 The `trailmix` crate combines the three analyzers behind one PCM-in/results-out
 API. The optional `trailmix-codecs` crate opens audio files, decodes them, preps

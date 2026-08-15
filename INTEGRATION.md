@@ -1,11 +1,11 @@
 # Integration contract
 
-This document defines the Trail Mix contract that applications such as Cueport
+This document defines the trail mix contract that applications such as Cueport
 can build against while the analysis algorithms continue to improve.
 
 ## Stability model
 
-Trail Mix has two integration entry points.
+trail mix has two integration entry points.
 
 1. `trailmix::analyze()` accepts finite mono `f32` PCM plus a sample rate.
 2. `trailmix_codecs::analyze_path()` accepts an audio file. It decodes the file,
@@ -95,7 +95,7 @@ as structured values:
 
 Cueport can convert this structure to display formats such as Camelot, Open Key,
 or localized labels in its own UI. If multiple applications need the same
-notation helpers, they should be added as explicit Trail Mix helper APIs without
+notation helpers, they should be added as explicit trail mix helper APIs without
 changing the stored key shape.
 
 `multi_key` follows the same meaning as `multi_tempo`: a secondary key covers
@@ -104,12 +104,14 @@ enough of the file to matter. It is not a nearby-key scoring tie.
 ## Waveform result
 
 `waveform.columns` contains compact display columns with `min`, `max`, and
-`rms` values. New analyses may also include `spectral_centroid`, an optional
-`0.0..=1.0` display hint where lower values are bass-heavy and higher values are
-treble-heavy. This field was added after the FOSSY presentation as the first
-additive waveform-contract change, so JSON captured before that point remains
-valid without it. The number of columns is bounded by the requested
-`AnalysisConfig.waveform_columns` and the source sample count.
+`rms` values. New analyses may also include `display_height`, an optional
+`0.0..=1.0` display envelope that blends RMS body with peak transients and then
+normalizes the result across the track for drawing. They may also include
+`spectral_centroid`, an optional `0.0..=1.0` display hint where lower values are
+bass-heavy and higher values are treble-heavy. These fields were added after
+the FOSSY presentation as additive waveform-contract changes, so JSON captured
+before that point remains valid without them. The number of columns is bounded
+by the requested `AnalysisConfig.waveform_columns` and the source sample count.
 
 Samples are treated as finite mono PCM. Non-finite values are handled as silence
 by waveform generation.
@@ -126,7 +128,7 @@ gates.
 
 The stable Cueport integration remains a thin Swift/FFI binding that accepts
 mono `Float32` PCM plus a sample rate and returns `Analysis` JSON. When a Rust
-desktop or server component can give Trail Mix the audio file, it may instead
+desktop or server component can give trail mix the audio file, it may instead
 call `trailmix_codecs::analyze_path()` and serialize the returned `Analysis` as
 `analysis-v1`.
 
@@ -136,7 +138,7 @@ Cueport should own:
 - UI-specific key notation and formatting.
 - Audio decoding when using the PCM entry point.
 
-Trail Mix should own:
+trail mix should own:
 
 - Offline BPM, beat, key, and waveform analysis.
 - Versioned result structures.
