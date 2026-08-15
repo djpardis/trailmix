@@ -172,8 +172,7 @@ mod tests {
         let fast = generate_overview(&fast_samples, 44_100, 1);
 
         assert!(
-            fast.columns[0].spectral_centroid.unwrap()
-                > slow.columns[0].spectral_centroid.unwrap()
+            fast.columns[0].spectral_centroid.unwrap() > slow.columns[0].spectral_centroid.unwrap()
         );
     }
 }
