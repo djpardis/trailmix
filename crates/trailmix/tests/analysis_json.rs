@@ -64,11 +64,13 @@ fn analysis_v1_json_matches_golden_fixture() {
                     min: -1.0,
                     max: 1.0,
                     rms: 0.5,
+                    spectral_centroid: None,
                 },
                 WaveformColumn {
                     min: -0.25,
                     max: 0.75,
                     rms: 0.25,
+                    spectral_centroid: None,
                 },
             ],
         },

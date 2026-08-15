@@ -176,7 +176,8 @@
       "properties": {
         "min": { "type": "number" },
         "max": { "type": "number" },
-        "rms": { "type": "number", "minimum": 0 }
+        "rms": { "type": "number", "minimum": 0 },
+        "spectral_centroid": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     }
   }

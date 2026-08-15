@@ -11,6 +11,9 @@ pub struct WaveformColumn {
     pub max: f32,
     /// Root mean square energy in the column.
     pub rms: f32,
+    /// Approximate spectral balance, where 0 is bass-heavy and 1 is treble-heavy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spectral_centroid: Option<f32>,
 }
 
 /// A versioned waveform overview generated from mono PCM.
@@ -78,6 +81,7 @@ pub fn generate_overview(
             min,
             max,
             rms: (sum_squares / window.len() as f64).sqrt() as f32,
+            spectral_centroid: Some(spectral_balance(window)),
         });
     }
 
@@ -86,6 +90,44 @@ pub fn generate_overview(
         sample_rate,
         source_samples: samples.len(),
         columns,
+    }
+}
+
+fn spectral_balance(window: &[f32]) -> f32 {
+    if window.len() < 2 {
+        return 0.5;
+    }
+
+    let mut abs_sum = 0.0_f64;
+    let mut delta_sum = 0.0_f64;
+    let mut zero_crossings = 0usize;
+    let mut previous = sanitize_sample(window[0]);
+
+    abs_sum += f64::from(previous.abs());
+    for &raw_sample in &window[1..] {
+        let sample = sanitize_sample(raw_sample);
+        abs_sum += f64::from(sample.abs());
+        delta_sum += f64::from((sample - previous).abs());
+        if (previous < 0.0 && sample >= 0.0) || (previous >= 0.0 && sample < 0.0) {
+            zero_crossings += 1;
+        }
+        previous = sample;
+    }
+
+    if abs_sum <= f64::EPSILON {
+        return 0.5;
+    }
+
+    let derivative_ratio = (delta_sum / (abs_sum * 2.0)).clamp(0.0, 1.0);
+    let zero_crossing_ratio = (zero_crossings as f64 / (window.len() - 1) as f64).clamp(0.0, 1.0);
+    (derivative_ratio.mul_add(0.7, zero_crossing_ratio * 0.3) as f32).clamp(0.0, 1.0)
+}
+
+fn sanitize_sample(raw_sample: f32) -> f32 {
+    if raw_sample.is_finite() {
+        raw_sample.clamp(-1.0, 1.0)
+    } else {
+        0.0
     }
 }
 
@@ -101,6 +143,7 @@ mod tests {
         assert_eq!(overview.columns[0].min, -1.0);
         assert_eq!(overview.columns[0].max, 1.0);
         assert!((overview.columns[0].rms - 1.0).abs() < f32::EPSILON);
+        assert!(overview.columns[0].spectral_centroid.is_some());
         assert!((overview.duration_seconds() - 1.0).abs() < f64::EPSILON);
     }
 
@@ -115,7 +158,22 @@ mod tests {
                 min: 0.0,
                 max: 0.0,
                 rms: 0.0,
+                spectral_centroid: Some(0.5),
             }
+        );
+    }
+
+    #[test]
+    fn spectral_balance_rises_with_fast_changes() {
+        let slow = generate_overview(&[-1.0; 64], 44_100, 1);
+        let fast_samples = (0..64)
+            .map(|index| if index % 2 == 0 { -1.0 } else { 1.0 })
+            .collect::<Vec<_>>();
+        let fast = generate_overview(&fast_samples, 44_100, 1);
+
+        assert!(
+            fast.columns[0].spectral_centroid.unwrap()
+                > slow.columns[0].spectral_centroid.unwrap()
         );
     }
 }

@@ -104,7 +104,11 @@ enough of the file to matter. It is not a nearby-key scoring tie.
 ## Waveform result
 
 `waveform.columns` contains compact display columns with `min`, `max`, and
-`rms` values. The number of columns is bounded by the requested
+`rms` values. New analyses may also include `spectral_centroid`, an optional
+`0.0..=1.0` display hint where lower values are bass-heavy and higher values are
+treble-heavy. This field was added after the FOSSY presentation as the first
+additive waveform-contract change, so JSON captured before that point remains
+valid without it. The number of columns is bounded by the requested
 `AnalysisConfig.waveform_columns` and the source sample count.
 
 Samples are treated as finite mono PCM. Non-finite values are handled as silence
