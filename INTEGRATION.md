@@ -105,8 +105,9 @@ enough of the file to matter. It is not a nearby-key scoring tie.
 
 `waveform.columns` contains compact display columns with `min`, `max`, and
 `rms` values. New analyses may also include `display_height`, an optional
-`0.0..=1.0` display envelope that blends RMS body with peak transients and then
-normalizes the result across the track for drawing. They may also include
+`0.0..=1.0` display envelope based on a geometric blend of RMS energy and peak
+amplitude, normalized against the track's upper percentile for drawing. They
+may also include
 `spectral_centroid`, an optional `0.0..=1.0` display hint where lower values are
 bass-heavy and higher values are treble-heavy. These fields were added after
 the FOSSY presentation as additive waveform-contract changes, so JSON captured

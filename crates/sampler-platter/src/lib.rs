@@ -104,8 +104,13 @@ fn apply_display_heights(columns: &mut [WaveformColumn]) {
         .iter()
         .map(|column| {
             let peak = column.min.abs().max(column.max.abs());
-            // RMS tracks perceived body, while peak keeps transients visible.
-            column.rms.mul_add(0.65, peak * 0.35)
+            if peak <= f32::EPSILON || column.rms <= f32::EPSILON {
+                0.0
+            } else {
+                // The geometric mean keeps peak transients visible while
+                // preserving RMS-driven differences inside dense music.
+                (peak * column.rms).sqrt()
+            }
         })
         .collect::<Vec<_>>();
 
@@ -117,17 +122,13 @@ fn apply_display_heights(columns: &mut [WaveformColumn]) {
         return;
     }
 
-    let noise_floor = percentile(energies.clone(), 0.10) * 0.5;
     let display_ceiling = percentile(energies.clone(), 0.95).max(max_energy * 0.5);
-    let range = (display_ceiling - noise_floor).max(max_energy * 0.05);
 
     for (column, energy) in columns.iter_mut().zip(energies) {
-        let normalized = ((energy - noise_floor) / range).clamp(0.0, 1.0);
-        let compressed = normalized.powf(0.42);
-        column.display_height = Some(if energy > f32::EPSILON {
-            compressed.max(0.06)
-        } else {
+        column.display_height = Some(if energy <= f32::EPSILON {
             0.0
+        } else {
+            (energy / display_ceiling).clamp(0.0, 1.0).powf(0.60)
         });
     }
 }
@@ -219,8 +220,21 @@ mod tests {
         let loud = overview.columns[1].display_height.unwrap();
 
         assert!(quiet > 0.02);
+        assert!(quiet < 0.5);
         assert!(quiet < loud);
         assert!(loud <= 1.0);
+    }
+
+    #[test]
+    fn display_height_is_monotonic_with_signal_level() {
+        let overview = generate_overview(&[-0.1, 0.1, -0.25, 0.25, -0.5, 0.5, -1.0, 1.0], 8, 4);
+        let heights = overview
+            .columns
+            .iter()
+            .map(|column| column.display_height.unwrap())
+            .collect::<Vec<_>>();
+
+        assert!(heights.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
