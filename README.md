@@ -49,11 +49,11 @@ let analysis = trailmix::analyze(audio, trailmix::AnalysisConfig::default());
   and local tempo segments. Uses autocorrelation with harmonic scoring and a
   gentle octave prior.
 - **key lime** estimates global and local major or minor keys using dual chroma
-  extraction (Goertzel + Constant-Q Transform), multiple key profiles
-  (Krumhansl-Kessler, Temperley, EDMA, and learned), median aggregation, and
-  confidence-gated segmentation.
+  extraction (Goertzel + Constant-Q Transform), averaged scores from multiple
+  key profiles (Krumhansl-Kessler, Temperley, EDMA, and learned), median
+  aggregation, and confidence-gated segmentation.
 - **sampler platter** generates compact waveform columns with raw min/max/RMS
-  values plus optional display height and spectral color hints.
+  values plus optional display height and band-energy color hints.
 
 The `trailmix` crate combines the three analyzers behind one PCM-in/results-out
 API. The optional `trailmix-codecs` crate opens audio files, decodes them, preps

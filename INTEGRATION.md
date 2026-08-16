@@ -60,7 +60,7 @@ Each nested analyzer also carries its own version. Applications should persist
 all component versions, not only the aggregate version:
 
 - `Analysis.version`: `1`
-- `BeatAnalysis.version`: `3`
+- `BeatAnalysis.version`: `4`
 - `KeyAnalysis.version`: `6`
 - `WaveformOverview.version`: `1`
 
@@ -69,9 +69,12 @@ The JSON Schema for this contract is stored at
 
 ## Beat result
 
-`beat.global_bpm` is the primary BPM estimate, or `null` when unavailable.
-`beat.beats` contains beat positions in seconds. `position_in_bar` is 1-based
-and currently assumes 4/4 meter.
+`beat.global_bpm` is the primary precise BPM estimate, or `null` when
+unavailable. `beat.display_bpm` is a UI-oriented value that keeps near-integer
+tempos as integers and preserves meaningful fractional tempos to one decimal
+place. `beat.display_bpm_decimals` tells callers whether the display value needs
+zero or one decimal places. `beat.beats` contains beat positions in seconds.
+`position_in_bar` is 1-based and currently assumes 4/4 meter.
 
 `multi_tempo` is for files with a meaningful secondary tempo, such as edits,
 medleys, or mashups. It is not a half-time or double-time ambiguity flag.
@@ -109,10 +112,12 @@ enough of the file to matter. It is not a nearby-key scoring tie.
 amplitude, normalized against the track's upper percentile for drawing. They
 may also include
 `spectral_centroid`, an optional `0.0..=1.0` display hint where lower values are
-bass-heavy and higher values are treble-heavy. These fields were added after
-the FOSSY presentation as additive waveform-contract changes, so JSON captured
-before that point remains valid without them. The number of columns is bounded
-by the requested `AnalysisConfig.waveform_columns` and the source sample count.
+bass-heavy and higher values are treble-heavy. New analyses compute that hint
+from log-spaced band energy rather than from time-domain zero crossings. These
+fields were added after the FOSSY presentation as additive waveform-contract
+changes, so JSON captured before that point remains valid without them. The
+number of columns is bounded by the requested `AnalysisConfig.waveform_columns`
+and the source sample count.
 
 Samples are treated as finite mono PCM. Non-finite values are handled as silence
 by waveform generation.

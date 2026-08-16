@@ -26,6 +26,12 @@ pub struct TempoSegment {
 pub struct BeatAnalysis {
     pub version: u32,
     pub global_bpm: Option<f32>,
+    /// Tempo rounded for library display. This never replaces `global_bpm`,
+    /// which remains the precise analyzer result for beatgrid math.
+    pub display_bpm: Option<f32>,
+    /// Number of decimal places the display BPM needs. Integer-like tempos use
+    /// zero decimals; fractional estimates use one decimal.
+    pub display_bpm_decimals: u8,
     pub confidence: f32,
     pub beats: Vec<BeatPosition>,
     pub tempo_segments: Vec<TempoSegment>,
@@ -112,8 +118,10 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: BeatConfig) -> BeatAna
     );
 
     BeatAnalysis {
-        version: 3,
+        version: 4,
         global_bpm: Some(global.bpm),
+        display_bpm: Some(display_bpm(global.bpm)),
+        display_bpm_decimals: display_bpm_decimals(global.bpm),
         confidence: global.confidence,
         beats,
         tempo_segments,
@@ -125,8 +133,10 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: BeatConfig) -> BeatAna
 
 fn empty_analysis() -> BeatAnalysis {
     BeatAnalysis {
-        version: 3,
+        version: 4,
         global_bpm: None,
+        display_bpm: None,
+        display_bpm_decimals: 0,
         confidence: 0.0,
         beats: Vec::new(),
         tempo_segments: Vec::new(),
@@ -139,6 +149,20 @@ fn empty_analysis() -> BeatAnalysis {
 fn bpm_matches(left: f32, right: f32, change_ratio: f32) -> bool {
     let scale = left.abs().max(right.abs()).max(f32::EPSILON);
     (left - right).abs() / scale <= change_ratio
+}
+
+fn display_bpm(bpm: f32) -> f32 {
+    let rounded = bpm.round();
+    if (bpm - rounded).abs() <= 0.05 {
+        rounded
+    } else {
+        (bpm * 10.0).round() / 10.0
+    }
+}
+
+fn display_bpm_decimals(bpm: f32) -> u8 {
+    let rounded = bpm.round();
+    if (bpm - rounded).abs() <= 0.05 { 0 } else { 1 }
 }
 
 /// Longest secondary tempo cluster by duration, if it covers enough of the track.
@@ -848,6 +872,18 @@ mod tests {
         let result = analyze(&samples, 44_100, config);
         assert!(!result.multi_tempo);
         assert_eq!(result.alternate_bpm, None);
+    }
+
+    #[test]
+    fn display_bpm_preserves_meaningful_fractional_tempos() {
+        assert_eq!(display_bpm(122.596), 122.6);
+        assert_eq!(display_bpm_decimals(122.596), 1);
+    }
+
+    #[test]
+    fn display_bpm_snaps_near_integer_tempos() {
+        assert_eq!(display_bpm(124.03), 124.0);
+        assert_eq!(display_bpm_decimals(124.03), 0);
     }
 
     #[test]

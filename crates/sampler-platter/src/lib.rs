@@ -85,7 +85,7 @@ pub fn generate_overview(
             max,
             rms: (sum_squares / window.len() as f64).sqrt() as f32,
             display_height: None,
-            spectral_centroid: Some(spectral_balance(window)),
+            spectral_centroid: Some(spectral_balance(window, sample_rate)),
         });
     }
 
@@ -142,11 +142,59 @@ fn percentile(mut values: Vec<f32>, p: f32) -> f32 {
     values[idx]
 }
 
-fn spectral_balance(window: &[f32]) -> f32 {
+fn spectral_balance(window: &[f32], sample_rate: u32) -> f32 {
     if window.len() < 2 {
         return 0.5;
     }
 
+    let nyquist = sample_rate as f32 / 2.0;
+    let max_freq = nyquist.min(10_000.0).max(80.0);
+    if sample_rate == 0 || max_freq <= 80.0 {
+        return time_domain_spectral_balance(window);
+    }
+
+    const BAND_COUNT: usize = 8;
+    let mut total = 0.0_f64;
+    let mut weighted = 0.0_f64;
+    for band in 0..BAND_COUNT {
+        let pos = band as f32 / (BAND_COUNT - 1) as f32;
+        let freq = 80.0 * (max_freq / 80.0).powf(pos);
+        let energy = goertzel_energy(window, sample_rate, freq);
+        total += energy;
+        weighted += energy * f64::from(pos);
+    }
+
+    if total > f64::EPSILON {
+        return (weighted / total).clamp(0.0, 1.0) as f32;
+    }
+
+    time_domain_spectral_balance(window)
+}
+
+fn goertzel_energy(window: &[f32], sample_rate: u32, freq: f32) -> f64 {
+    let omega = 2.0 * std::f32::consts::PI * freq / sample_rate as f32;
+    let coeff = 2.0 * omega.cos();
+    let mut previous = 0.0_f32;
+    let mut previous_previous = 0.0_f32;
+    let denom = (window.len().saturating_sub(1)).max(1) as f32;
+
+    for (idx, &raw_sample) in window.iter().enumerate() {
+        let phase = idx as f32 / denom;
+        let win = 0.5 - 0.5 * (2.0 * std::f32::consts::PI * phase).cos();
+        let sample = sanitize_sample(raw_sample) * win;
+        let current = sample + coeff * previous - previous_previous;
+        previous_previous = previous;
+        previous = current;
+    }
+
+    f64::from(
+        (previous_previous * previous_previous + previous * previous
+            - coeff * previous * previous_previous)
+            .max(0.0),
+    )
+}
+
+fn time_domain_spectral_balance(window: &[f32]) -> f32 {
     let mut abs_sum = 0.0_f64;
     let mut delta_sum = 0.0_f64;
     let mut zero_crossings = 0usize;
@@ -248,5 +296,23 @@ mod tests {
         assert!(
             fast.columns[0].spectral_centroid.unwrap() > slow.columns[0].spectral_centroid.unwrap()
         );
+    }
+
+    #[test]
+    fn spectral_balance_uses_frequency_energy() {
+        let sample_rate = 44_100;
+        let low = sine_wave(120.0, sample_rate, 4_096);
+        let high = sine_wave(5_000.0, sample_rate, 4_096);
+
+        assert!(spectral_balance(&high, sample_rate) > spectral_balance(&low, sample_rate));
+    }
+
+    fn sine_wave(frequency: f32, sample_rate: u32, len: usize) -> Vec<f32> {
+        (0..len)
+            .map(|index| {
+                (2.0 * std::f32::consts::PI * frequency * index as f32 / sample_rate as f32).sin()
+                    * 0.5
+            })
+            .collect()
     }
 }

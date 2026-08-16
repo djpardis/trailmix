@@ -61,7 +61,8 @@ result. `trailmix-codecs` handles file decoding and mono prep.
     semitone resolution across all octaves.
   - Multiple key profiles: scores chroma against Krumhansl-Kessler (1982),
     Temperley (2001), EDMA (Faraldo et al. 2016), and corpus-learned profiles,
-    picking the best correlation across all candidates.
+    averaging those profile-family scores before ranking candidates. This keeps
+    one profile family from dominating close major/minor decisions by itself.
   - Tuning estimation: detects sub-semitone pitch offset and shifts chroma
     before classification.
   - Median chroma aggregation: global chroma takes the per-pitch-class median
@@ -76,7 +77,7 @@ result. `trailmix-codecs` handles file decoding and mono prep.
   - Segment-majority voting: global key uses the longest segment's key when
     multiple segments exist.
 - `sampler-platter` bins PCM into waveform columns with raw min, max, and RMS
-  values plus display-oriented height and spectral color hints.
+  values plus display-oriented height and log-spaced band-energy color hints.
 - `trailmix-codecs` provides separately selectable common-format decoders,
   downmixes decoded channels to mono PCM, and exposes audio-file analysis
   helpers.

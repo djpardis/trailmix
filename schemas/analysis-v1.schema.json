@@ -19,6 +19,8 @@
       "required": [
         "version",
         "global_bpm",
+        "display_bpm",
+        "display_bpm_decimals",
         "confidence",
         "beats",
         "tempo_segments",
@@ -27,9 +29,17 @@
         "alternate_coverage"
       ],
       "properties": {
-        "version": { "const": 3 },
+        "version": { "const": 4 },
         "global_bpm": {
           "anyOf": [{ "type": "number" }, { "type": "null" }]
+        },
+        "display_bpm": {
+          "anyOf": [{ "type": "number" }, { "type": "null" }]
+        },
+        "display_bpm_decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
         },
         "confidence": { "type": "number" },
         "beats": {

@@ -806,27 +806,31 @@ fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
     let mut best_score = f32::NEG_INFINITY;
     let mut second_score = f32::NEG_INFINITY;
 
-    for &(major_profile, minor_profile) in profiles {
-        for root in 0..12 {
-            let major_corr = correlation(chroma, major_profile, root);
-            let minor_corr = correlation(chroma, minor_profile, root);
+    for root in 0..12 {
+        let mut major_sum = 0.0;
+        let mut minor_sum = 0.0;
+        for &(major_profile, minor_profile) in profiles {
+            major_sum += correlation(chroma, major_profile, root);
+            minor_sum += correlation(chroma, minor_profile, root);
+        }
+        let major_score = major_sum / profiles.len() as f32;
+        let minor_score = minor_sum / profiles.len() as f32;
 
-            for (mode, score) in [(Mode::Major, major_corr), (Mode::Minor, minor_corr)] {
-                if score > best_score {
-                    second_score = best_score;
-                    second_key = best_key;
-                    best_score = score;
-                    best_key = MusicalKey {
-                        tonic: PitchClass::ALL[root],
-                        mode,
-                    };
-                } else if score > second_score {
-                    second_score = score;
-                    second_key = MusicalKey {
-                        tonic: PitchClass::ALL[root],
-                        mode,
-                    };
-                }
+        for (mode, score) in [(Mode::Major, major_score), (Mode::Minor, minor_score)] {
+            if score > best_score {
+                second_score = best_score;
+                second_key = best_key;
+                best_score = score;
+                best_key = MusicalKey {
+                    tonic: PitchClass::ALL[root],
+                    mode,
+                };
+            } else if score > second_score {
+                second_score = score;
+                second_key = MusicalKey {
+                    tonic: PitchClass::ALL[root],
+                    mode,
+                };
             }
         }
     }

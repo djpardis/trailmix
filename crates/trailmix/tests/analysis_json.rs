@@ -9,8 +9,10 @@ fn analysis_v1_json_matches_golden_fixture() {
         version: 1,
         duration_seconds: 12.5,
         beat: BeatAnalysis {
-            version: 3,
+            version: 4,
             global_bpm: Some(124.0),
+            display_bpm: Some(124.0),
+            display_bpm_decimals: 0,
             confidence: 0.75,
             beats: vec![
                 BeatPosition {
