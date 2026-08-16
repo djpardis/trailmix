@@ -39,7 +39,7 @@
         "display_bpm_decimals": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 1
+          "maximum": 0
         },
         "confidence": { "type": "number" },
         "beats": {

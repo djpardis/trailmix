@@ -120,8 +120,8 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: BeatConfig) -> BeatAna
     BeatAnalysis {
         version: 4,
         global_bpm: Some(global.bpm),
-        display_bpm: Some(display_bpm(global.bpm)),
-        display_bpm_decimals: display_bpm_decimals(global.bpm),
+        display_bpm: Some(display_bpm(global.bpm, &beats)),
+        display_bpm_decimals: 0,
         confidence: global.confidence,
         beats,
         tempo_segments,
@@ -151,18 +151,54 @@ fn bpm_matches(left: f32, right: f32, change_ratio: f32) -> bool {
     (left - right).abs() / scale <= change_ratio
 }
 
-fn display_bpm(bpm: f32) -> f32 {
-    let rounded = bpm.round();
-    if (bpm - rounded).abs() <= 0.05 {
-        rounded
-    } else {
-        (bpm * 10.0).round() / 10.0
+fn display_bpm(bpm: f32, beats: &[BeatPosition]) -> f32 {
+    let nearest = bpm.round().max(1.0);
+    if beats.len() < 4 {
+        return nearest;
     }
+
+    let start = (bpm - 2.0).floor().max(1.0) as i32;
+    let end = (bpm + 2.0).ceil().max(start as f32) as i32;
+    (start..=end)
+        .map(|candidate| candidate as f32)
+        .min_by(|left, right| {
+            let left_error = beat_grid_fit_error(*left, beats);
+            let right_error = beat_grid_fit_error(*right, beats);
+            left_error
+                .total_cmp(&right_error)
+                .then_with(|| (left - bpm).abs().total_cmp(&(right - bpm).abs()))
+        })
+        .unwrap_or(nearest)
 }
 
-fn display_bpm_decimals(bpm: f32) -> u8 {
-    let rounded = bpm.round();
-    if (bpm - rounded).abs() <= 0.05 { 0 } else { 1 }
+fn beat_grid_fit_error(bpm: f32, beats: &[BeatPosition]) -> f64 {
+    if bpm <= 0.0 || beats.len() < 2 {
+        return f64::INFINITY;
+    }
+    let period = 60.0 / f64::from(bpm);
+    let mut offsets = beats
+        .iter()
+        .enumerate()
+        .map(|(idx, beat)| beat.time_seconds - idx as f64 * period)
+        .collect::<Vec<_>>();
+    let offset = median_f64(&mut offsets);
+    beats
+        .iter()
+        .enumerate()
+        .map(|(idx, beat)| {
+            let expected = offset + idx as f64 * period;
+            (beat.time_seconds - expected).abs()
+        })
+        .sum::<f64>()
+        / beats.len() as f64
+}
+
+fn median_f64(values: &mut [f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.sort_by(f64::total_cmp);
+    values[values.len() / 2]
 }
 
 /// Longest secondary tempo cluster by duration, if it covers enough of the track.
@@ -767,6 +803,17 @@ mod tests {
         onset
     }
 
+    fn regular_beats(bpm: f32, count: usize) -> Vec<BeatPosition> {
+        let interval = 60.0 / f64::from(bpm);
+        (0..count)
+            .map(|idx| BeatPosition {
+                time_seconds: idx as f64 * interval,
+                confidence: 1.0,
+                position_in_bar: (idx % 4 + 1) as u8,
+            })
+            .collect()
+    }
+
     #[test]
     fn detects_a_120_bpm_click_track() {
         let samples = click_track(120.0, 20.0, 44_100);
@@ -875,15 +922,15 @@ mod tests {
     }
 
     #[test]
-    fn display_bpm_preserves_meaningful_fractional_tempos() {
-        assert_eq!(display_bpm(122.596), 122.6);
-        assert_eq!(display_bpm_decimals(122.596), 1);
+    fn display_bpm_uses_the_integer_tempo_that_best_fits_beats() {
+        let beats = regular_beats(122.0, 64);
+        assert_eq!(display_bpm(122.596, &beats), 122.0);
     }
 
     #[test]
-    fn display_bpm_snaps_near_integer_tempos() {
-        assert_eq!(display_bpm(124.03), 124.0);
-        assert_eq!(display_bpm_decimals(124.03), 0);
+    fn display_bpm_can_choose_the_upper_integer() {
+        let beats = regular_beats(123.0, 64);
+        assert_eq!(display_bpm(122.596, &beats), 123.0);
     }
 
     #[test]
