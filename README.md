@@ -43,6 +43,23 @@ When the application already has mono PCM, call the core API directly.
 let analysis = trailmix::analyze(audio, trailmix::AnalysisConfig::default());
 ```
 
+## Benchmarking against a Cueport Serato folder
+
+`trailmix-bench` can compare trail mix output against the Serato BPM and key
+values that Cueport imported for a specific folder. The command prints progress
+for each file, records the trail mix git SHA, hashes the exact audio file, and
+writes optional JSON Lines output as each track finishes.
+
+```sh
+cargo run -p trailmix-bench --release -- \
+  --cueport-db "$HOME/Library/Application Support/com.cueport.app/cueport.db" \
+  --cueport-serato-folder "$HOME/Music/Music/Download library/mp3s/qobuz/qobuz-2026-01" \
+  --jsonl /tmp/trailmix-qobuz.jsonl
+```
+
+The summary separates decoder failures, tracks with no detected BPM, ordinary
+BPM error, octave-aware BPM error, exact key agreement, and MIREX key score.
+
 ## Structure
 
 - **beat salad** estimates global BPM, beat positions with downbeat inference,
