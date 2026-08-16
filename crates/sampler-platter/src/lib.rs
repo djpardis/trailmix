@@ -143,17 +143,21 @@ fn percentile(mut values: Vec<f32>, p: f32) -> f32 {
 }
 
 fn spectral_balance(window: &[f32], sample_rate: u32) -> f32 {
+    const BAND_COUNT: usize = 8;
+
     if window.len() < 2 {
         return 0.5;
     }
-
-    let nyquist = sample_rate as f32 / 2.0;
-    let max_freq = nyquist.min(10_000.0).max(80.0);
-    if sample_rate == 0 || max_freq <= 80.0 {
+    if sample_rate == 0 {
         return time_domain_spectral_balance(window);
     }
 
-    const BAND_COUNT: usize = 8;
+    let nyquist = sample_rate as f32 / 2.0;
+    let max_freq = nyquist.clamp(80.0, 10_000.0);
+    if max_freq <= 80.0 {
+        return time_domain_spectral_balance(window);
+    }
+
     let mut total = 0.0_f64;
     let mut weighted = 0.0_f64;
     for band in 0..BAND_COUNT {

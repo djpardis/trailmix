@@ -51,7 +51,7 @@ for each file, records the trail mix git SHA, hashes the exact audio file, and
 writes optional JSON Lines output as each track finishes.
 
 ```sh
-cargo run -p trailmix-bench --release -- \
+cargo run -p trailmix-bench --release --features cueport-db -- \
   --cueport-db "$HOME/Library/Application Support/com.cueport.app/cueport.db" \
   --cueport-serato-folder "$HOME/Music/Music/Download library/mp3s/qobuz/qobuz-2026-01" \
   --jsonl /tmp/trailmix-qobuz.jsonl

@@ -1,14 +1,16 @@
 use std::{
     env,
     error::Error,
+    fmt::Write as FmtWrite,
     fs::File,
-    io::{BufWriter, Read, Write},
+    io::{BufWriter, Read, Write as IoWrite},
     path::Path,
     process::{Command, ExitCode},
     time::Instant,
 };
 
 use rayon::prelude::*;
+#[cfg(feature = "cueport-db")]
 use rusqlite::Connection;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -286,51 +288,60 @@ fn run_cueport_serato_folder(
     limit: Option<usize>,
     jsonl_path: Option<&Path>,
 ) -> Result<CueportSeratoFolderBenchmark, Box<dyn Error>> {
-    let tracks = cueport_serato_tracks(db_path, folder, limit)?;
-    let mut jsonl = if let Some(path) = jsonl_path {
-        Some(BufWriter::new(File::create(path)?))
-    } else {
-        None
-    };
-    let mut results = Vec::with_capacity(tracks.len());
-
-    for (idx, track) in tracks.iter().enumerate() {
-        eprintln!(
-            "[{}/{}] {}",
-            idx + 1,
-            tracks.len(),
-            track.title.as_deref().unwrap_or(&track.path)
-        );
-        let result = analyze_cueport_serato_track(track);
-        if let Some(writer) = jsonl.as_mut() {
-            serde_json::to_writer(&mut *writer, &result)?;
-            writer.write_all(b"\n")?;
-            writer.flush()?;
-        }
-        results.push(result);
+    #[cfg(not(feature = "cueport-db"))]
+    {
+        let _ = (db_path, folder, limit, jsonl_path);
+        Err("Cueport Serato folder comparison requires --features cueport-db".into())
     }
 
-    Ok(CueportSeratoFolderBenchmark {
-        version: 1,
-        trailmix_git_sha: trailmix_git_sha(),
-        cueport_db: db_path.display().to_string(),
-        folder: folder.display().to_string(),
-        reference_tracks: tracks.len(),
-        analyzed_tracks: results
-            .iter()
-            .filter(|track| matches!(track.status, CueportSeratoStatus::Analyzed))
-            .count(),
-        decode_errors: results
-            .iter()
-            .filter(|track| matches!(track.status, CueportSeratoStatus::DecodeError))
-            .count(),
-        no_bpm_tracks: results
-            .iter()
-            .filter(|track| matches!(track.status, CueportSeratoStatus::NoBpm))
-            .count(),
-        summary: cueport_serato_summary(&results),
-        tracks: results,
-    })
+    #[cfg(feature = "cueport-db")]
+    {
+        let tracks = cueport_serato_tracks(db_path, folder, limit)?;
+        let mut jsonl = if let Some(path) = jsonl_path {
+            Some(BufWriter::new(File::create(path)?))
+        } else {
+            None
+        };
+        let mut results = Vec::with_capacity(tracks.len());
+
+        for (idx, track) in tracks.iter().enumerate() {
+            eprintln!(
+                "[{}/{}] {}",
+                idx + 1,
+                tracks.len(),
+                track.title.as_deref().unwrap_or(&track.path)
+            );
+            let result = analyze_cueport_serato_track(track);
+            if let Some(writer) = jsonl.as_mut() {
+                serde_json::to_writer(&mut *writer, &result)?;
+                writer.write_all(b"\n")?;
+                writer.flush()?;
+            }
+            results.push(result);
+        }
+
+        Ok(CueportSeratoFolderBenchmark {
+            version: 1,
+            trailmix_git_sha: trailmix_git_sha(),
+            cueport_db: db_path.display().to_string(),
+            folder: folder.display().to_string(),
+            reference_tracks: tracks.len(),
+            analyzed_tracks: results
+                .iter()
+                .filter(|track| matches!(track.status, CueportSeratoStatus::Analyzed))
+                .count(),
+            decode_errors: results
+                .iter()
+                .filter(|track| matches!(track.status, CueportSeratoStatus::DecodeError))
+                .count(),
+            no_bpm_tracks: results
+                .iter()
+                .filter(|track| matches!(track.status, CueportSeratoStatus::NoBpm))
+                .count(),
+            summary: cueport_serato_summary(&results),
+            tracks: results,
+        })
+    }
 }
 
 struct CueportSeratoDbTrack {
@@ -341,6 +352,7 @@ struct CueportSeratoDbTrack {
     key: Option<String>,
 }
 
+#[cfg(feature = "cueport-db")]
 fn cueport_serato_tracks(
     db_path: &Path,
     folder: &Path,
@@ -521,7 +533,7 @@ fn cueport_serato_summary(results: &[CueportSeratoTrackResult]) -> CueportSerato
 fn file_sha256(path: &Path) -> Result<String, Box<dyn Error>> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
+    let mut buffer = vec![0_u8; 64 * 1024];
     loop {
         let read = file.read(&mut buffer)?;
         if read == 0 {
@@ -529,11 +541,11 @@ fn file_sha256(path: &Path) -> Result<String, Box<dyn Error>> {
         }
         hasher.update(&buffer[..read]);
     }
-    Ok(hasher
-        .finalize()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect())
+    let mut hex = String::with_capacity(64);
+    for byte in hasher.finalize() {
+        write!(&mut hex, "{byte:02x}")?;
+    }
+    Ok(hex)
 }
 
 fn trailmix_git_sha() -> Option<String> {
@@ -557,7 +569,7 @@ fn median_f32(mut values: Vec<f32>) -> Option<f32> {
     values.sort_by(f32::total_cmp);
     let midpoint = values.len() / 2;
     Some(if values.len() % 2 == 0 {
-        (values[midpoint - 1] + values[midpoint]) / 2.0
+        f32::midpoint(values[midpoint - 1], values[midpoint])
     } else {
         values[midpoint]
     })
