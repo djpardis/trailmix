@@ -27,6 +27,9 @@ result. `trailmix-codecs` handles file decoding and mono prep.
   - tempo estimation applies a gentle octave prior (sigma=2 octaves, centered
     on 120 BPM) to reduce half/double errors without penalizing fast tempos
     (170+ BPM).
+  - display BPM remains separate from the precise estimate. It is an integer
+    selected by fitting the floor and ceiling integer candidates around the
+    precise BPM to the detected beat positions and choosing the lower residual.
   - `BeatPosition` includes a `position_in_bar` field (1-4, assumes 4/4 meter)
     for downbeat inference.
   - an optional `onnx-beat` feature enables ONNX-based beat tracking using

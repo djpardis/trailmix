@@ -152,15 +152,15 @@ fn bpm_matches(left: f32, right: f32, change_ratio: f32) -> bool {
 }
 
 fn display_bpm(bpm: f32, beats: &[BeatPosition]) -> f32 {
+    let lower = bpm.floor().max(1.0);
+    let upper = bpm.ceil().max(lower);
     let nearest = bpm.round().max(1.0);
     if beats.len() < 4 {
         return nearest;
     }
 
-    let start = (bpm - 2.0).floor().max(1.0) as i32;
-    let end = (bpm + 2.0).ceil().max(start as f32) as i32;
-    (start..=end)
-        .map(|candidate| candidate as f32)
+    [lower, upper]
+        .into_iter()
         .min_by(|left, right| {
             let left_error = beat_grid_fit_error(*left, beats);
             let right_error = beat_grid_fit_error(*right, beats);

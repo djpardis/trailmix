@@ -71,11 +71,12 @@ The JSON Schema for this contract is stored at
 
 `beat.global_bpm` is the primary precise BPM estimate, or `null` when
 unavailable. `beat.display_bpm` is a UI-oriented integer tempo selected by
-fitting nearby integer candidates to the detected beat positions. It is intended
-for DJ library display, while `global_bpm` remains available for precise
-analysis. `beat.display_bpm_decimals` is currently always `0`. `beat.beats`
-contains beat positions in seconds. `position_in_bar` is 1-based and currently
-assumes 4/4 meter.
+fitting the floor and ceiling integer candidates around `global_bpm` to the
+detected beat positions and choosing the lower residual. It is intended for DJ
+library display, while `global_bpm` remains available for precise analysis.
+`beat.display_bpm_decimals` is currently always `0`. `beat.beats` contains beat
+positions in seconds. `position_in_bar` is 1-based and currently assumes 4/4
+meter.
 
 `multi_tempo` is for files with a meaningful secondary tempo, such as edits,
 medleys, or mashups. It is not a half-time or double-time ambiguity flag.
