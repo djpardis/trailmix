@@ -406,7 +406,7 @@ fn estimate_tempo(
         candidates.push((lag, score));
     }
 
-    // Sub-harmonic resolution: if the best candidate is fast (>160 BPM) and a
+    // Sub-harmonic resolution: if the best candidate is fast (>135 BPM) and a
     // candidate at 2/3 or 3/4 of that BPM has good support, prefer the slower one.
     let &(best_lag, best_score) = candidates
         .iter()
@@ -454,7 +454,7 @@ fn resolve_fast_tempo_subharmonic(
     max_lag: usize,
     candidates: &[(usize, f32)],
 ) -> usize {
-    if best_bpm <= 160.0 {
+    if best_bpm <= 135.0 {
         return best_lag;
     }
 
@@ -931,6 +931,22 @@ mod tests {
     fn display_bpm_can_choose_the_upper_integer() {
         let beats = regular_beats(123.0, 64);
         assert_eq!(display_bpm(122.596, &beats), 123.0);
+    }
+
+    #[test]
+    fn resolves_supported_four_three_alias_below_160_bpm() {
+        let chosen =
+            resolve_fast_tempo_subharmonic(30, 1.0, 144.0, 20, 80, &[(30, 1.0), (40, 0.92)]);
+
+        assert_eq!(chosen, 40);
+    }
+
+    #[test]
+    fn keeps_midtempo_candidate_without_subharmonic_support() {
+        let chosen =
+            resolve_fast_tempo_subharmonic(32, 1.0, 135.0, 20, 80, &[(32, 1.0), (42, 0.55)]);
+
+        assert_eq!(chosen, 32);
     }
 
     #[test]
