@@ -58,7 +58,9 @@ cargo run -p trailmix-bench --release --features cueport-db -- \
 ```
 
 The summary separates decoder failures, tracks with no detected BPM, ordinary
-BPM error, octave-aware BPM error, exact key agreement, and MIREX key score.
+BPM error, octave-aware BPM error, MIREX Accuracy 1 and Accuracy 2, tempo
+ratio buckets, exact key agreement, MIREX key score, and key-relationship
+buckets.
 
 ## Structure
 

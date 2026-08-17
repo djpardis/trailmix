@@ -65,8 +65,10 @@ struct CorpusSummary {
     failed_tracks: usize,
     bpm_mean_absolute_error: Option<f32>,
     bpm_octave_aware_mean_absolute_error: Option<f32>,
+    tempo_taxonomy: TempoTaxonomy,
     exact_key_accuracy: Option<f32>,
     mirex_weighted_score: Option<f32>,
+    key_taxonomy: KeyTaxonomy,
     tempo_segment_mean_absolute_error: Option<f32>,
     key_segment_exact_accuracy: Option<f32>,
     beat_f1: Option<f32>,
@@ -104,10 +106,12 @@ struct TrackResult {
     detected_bpm: Option<f32>,
     bpm_absolute_error: Option<f32>,
     bpm_octave_aware_absolute_error: Option<f32>,
+    tempo_relation: Option<TempoRelation>,
     expected_key: Option<String>,
     detected_key: Option<String>,
     exact_key_match: Option<bool>,
     mirex_score: Option<f32>,
+    key_relation: Option<KeyRelation>,
     tempo_segment_mean_absolute_error: Option<f32>,
     key_segment_exact_accuracy: Option<f32>,
     beat_f1: Option<f32>,
@@ -155,8 +159,10 @@ struct CueportSeratoSummary {
     bpm_octave_aware_mean_absolute_error: Option<f32>,
     bpm_within_one: usize,
     bpm_octave_within_one: usize,
+    tempo_taxonomy: TempoTaxonomy,
     key_exact_accuracy: Option<f32>,
     key_mirex_mean: Option<f32>,
+    key_taxonomy: KeyTaxonomy,
 }
 
 #[derive(Serialize)]
@@ -171,9 +177,11 @@ struct CueportSeratoTrackResult {
     trailmix_display_bpm: Option<f32>,
     bpm_absolute_error: Option<f32>,
     bpm_octave_aware_error: Option<f32>,
+    tempo_relation: Option<TempoRelation>,
     trailmix_key: Option<String>,
     exact_key_match: Option<bool>,
     mirex_score: Option<f32>,
+    key_relation: Option<KeyRelation>,
     decode_milliseconds: Option<f64>,
     analysis_milliseconds: Option<f64>,
     status: CueportSeratoStatus,
@@ -433,9 +441,11 @@ fn analyze_cueport_serato_track(track: &CueportSeratoDbTrack) -> CueportSeratoTr
             trailmix_display_bpm: None,
             bpm_absolute_error: None,
             bpm_octave_aware_error: None,
+            tempo_relation: None,
             trailmix_key: analysis.key.key.map(|key| key.to_string()),
             exact_key_match: None,
             mirex_score: None,
+            key_relation: None,
             decode_milliseconds: Some(decode_ms),
             analysis_milliseconds: Some(analysis_ms),
             status: CueportSeratoStatus::NoBpm,
@@ -464,9 +474,15 @@ fn analyze_cueport_serato_track(track: &CueportSeratoDbTrack) -> CueportSeratoTr
         trailmix_display_bpm: Some(display_bpm),
         bpm_absolute_error: track.bpm.map(|bpm| (display_bpm - bpm).abs()),
         bpm_octave_aware_error: track.bpm.map(|bpm| octave_aware_error(bpm, display_bpm)),
+        tempo_relation: track
+            .bpm
+            .map(|bpm| classify_tempo(bpm, display_bpm, TEMPO_TOLERANCE)),
         trailmix_key: detected_key.map(|key| key.to_string()),
         exact_key_match,
         mirex_score,
+        key_relation: serato_key
+            .zip(detected_key)
+            .map(|(expected, detected)| classify_key_relation(expected, detected)),
         decode_milliseconds: Some(decode_ms),
         analysis_milliseconds: Some(analysis_ms),
         status: CueportSeratoStatus::Analyzed,
@@ -491,9 +507,11 @@ fn cueport_serato_error(
         trailmix_display_bpm: None,
         bpm_absolute_error: None,
         bpm_octave_aware_error: None,
+        tempo_relation: None,
         trailmix_key: None,
         exact_key_match: None,
         mirex_score: None,
+        key_relation: None,
         decode_milliseconds: None,
         analysis_milliseconds: None,
         status,
@@ -518,6 +536,14 @@ fn cueport_serato_summary(results: &[CueportSeratoTrackResult]) -> CueportSerato
         .iter()
         .filter_map(|track| track.mirex_score)
         .collect::<Vec<_>>();
+    let tempo_relations = results
+        .iter()
+        .filter_map(|track| track.tempo_relation)
+        .collect::<Vec<_>>();
+    let key_relations = results
+        .iter()
+        .filter_map(|track| track.key_relation)
+        .collect::<Vec<_>>();
 
     CueportSeratoSummary {
         bpm_mean_absolute_error: mean_f32(&bpm_errors),
@@ -525,8 +551,10 @@ fn cueport_serato_summary(results: &[CueportSeratoTrackResult]) -> CueportSerato
         bpm_octave_aware_mean_absolute_error: mean_f32(&octave_errors),
         bpm_within_one: bpm_errors.iter().filter(|error| **error <= 1.0).count(),
         bpm_octave_within_one: octave_errors.iter().filter(|error| **error <= 1.0).count(),
+        tempo_taxonomy: build_tempo_taxonomy(&tempo_relations),
         key_exact_accuracy: bool_accuracy(&exact_keys),
         key_mirex_mean: mean_f32(&mirex_scores),
+        key_taxonomy: build_key_taxonomy(&key_relations),
     }
 }
 
@@ -831,12 +859,12 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         detected_bpm: analysis.beat.global_bpm,
         bpm_absolute_error,
         bpm_octave_aware_absolute_error,
+        tempo_relation: metrical_relation(track.expected_bpm, analysis.beat.global_bpm),
         expected_key: expected_key.map(|key| key.to_string()),
         detected_key: detected_key.map(|key| key.to_string()),
         exact_key_match: expected_key.map(|expected| Some(expected) == detected_key),
-        mirex_score: expected_key
-            .zip(detected_key)
-            .map(|(expected, detected)| mirex_key_score(expected, detected)),
+        mirex_score: mirex_of(expected_key, detected_key),
+        key_relation: harmonic_relation(expected_key, detected_key),
         tempo_segment_mean_absolute_error: tempo_segment_error(
             &track.expected_tempo_segments,
             &analysis,
@@ -928,12 +956,12 @@ fn analyze_manifest_track_fast(track: &TrackAnnotation, base_directory: &Path) -
         detected_bpm: analysis.beat.global_bpm,
         bpm_absolute_error,
         bpm_octave_aware_absolute_error,
+        tempo_relation: metrical_relation(track.expected_bpm, analysis.beat.global_bpm),
         expected_key: expected_key.map(|key| key.to_string()),
         detected_key: detected_key.map(|key| key.to_string()),
         exact_key_match: expected_key.map(|expected| Some(expected) == detected_key),
-        mirex_score: expected_key
-            .zip(detected_key)
-            .map(|(expected, detected)| mirex_key_score(expected, detected)),
+        mirex_score: mirex_of(expected_key, detected_key),
+        key_relation: harmonic_relation(expected_key, detected_key),
         tempo_segment_mean_absolute_error: tempo_segment_error(
             &track.expected_tempo_segments,
             &analysis,
@@ -997,10 +1025,12 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         detected_bpm: None,
         bpm_absolute_error: None,
         bpm_octave_aware_absolute_error: None,
+        tempo_relation: None,
         expected_key: track.expected_key.clone(),
         detected_key: None,
         exact_key_match: None,
         mirex_score: None,
+        key_relation: None,
         tempo_segment_mean_absolute_error: None,
         key_segment_exact_accuracy: None,
         beat_f1: None,
@@ -1045,6 +1075,219 @@ fn octave_aware_error(expected: f32, detected: f32) -> f32 {
     ]
     .into_iter()
     .fold(f32::INFINITY, f32::min)
+}
+
+/// Relative tolerance for tempo classification. A detected tempo counts as a given
+/// metrical relationship when its ratio to the reference lands within this fraction
+/// of the target ratio. Four percent is the MIREX tempo tolerance.
+const TEMPO_TOLERANCE: f32 = 0.04;
+
+/// The metrical relationship between a detected tempo and its reference. Splitting
+/// misses into named ratios turns one mean-error number into an error taxonomy, so a
+/// change can be judged by which bucket shrank rather than by aggregate error alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum TempoRelation {
+    Exact,
+    Double,
+    Half,
+    Triple,
+    Third,
+    ThreeToTwo,
+    TwoToThree,
+    FourToThree,
+    ThreeToFour,
+    Other,
+}
+
+impl TempoRelation {
+    /// True when the relationship counts toward MIREX Accuracy 1 (exact within
+    /// tolerance).
+    fn is_accuracy_1(self) -> bool {
+        matches!(self, Self::Exact)
+    }
+
+    /// True when the relationship counts toward MIREX Accuracy 2, which forgives the
+    /// simple metrical factors 1/3, 1/2, 2, and 3.
+    fn is_accuracy_2(self) -> bool {
+        matches!(
+            self,
+            Self::Exact | Self::Double | Self::Half | Self::Triple | Self::Third
+        )
+    }
+}
+
+/// Classify a detected tempo against a reference by the closest simple ratio.
+fn classify_tempo(expected: f32, detected: f32, tolerance: f32) -> TempoRelation {
+    if !expected.is_finite() || !detected.is_finite() || expected <= 0.0 || detected <= 0.0 {
+        return TempoRelation::Other;
+    }
+    let ratio = detected / expected;
+    let within = |target: f32| (ratio - target).abs() <= target * tolerance;
+    // Ordered from the strongest to the weakest relationship so that a tempo near an
+    // exact match is never mislabeled as a ratio miss.
+    if within(1.0) {
+        TempoRelation::Exact
+    } else if within(2.0) {
+        TempoRelation::Double
+    } else if within(0.5) {
+        TempoRelation::Half
+    } else if within(3.0) {
+        TempoRelation::Triple
+    } else if within(1.0 / 3.0) {
+        TempoRelation::Third
+    } else if within(1.5) {
+        TempoRelation::ThreeToTwo
+    } else if within(2.0 / 3.0) {
+        TempoRelation::TwoToThree
+    } else if within(4.0 / 3.0) {
+        TempoRelation::FourToThree
+    } else if within(0.75) {
+        TempoRelation::ThreeToFour
+    } else {
+        TempoRelation::Other
+    }
+}
+
+/// The harmonic relationship between a detected key and its reference, following the
+/// MIREX key categories with tritone split out from the residual bucket. Perfect
+/// fifths are counted in both directions (up a fifth or down a fifth).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum KeyRelation {
+    Exact,
+    Fifth,
+    Relative,
+    Parallel,
+    Tritone,
+    Other,
+}
+
+fn classify_key_relation(expected: MusicalKey, detected: MusicalKey) -> KeyRelation {
+    if expected == detected {
+        return KeyRelation::Exact;
+    }
+    let interval = (detected.tonic as i8 - expected.tonic as i8).rem_euclid(12) as u8;
+    if expected.mode == detected.mode && (interval == 7 || interval == 5) {
+        return KeyRelation::Fifth;
+    }
+    let is_relative = match expected.mode {
+        Mode::Major => detected.mode == Mode::Minor && interval == 9,
+        Mode::Minor => detected.mode == Mode::Major && interval == 3,
+    };
+    if is_relative {
+        return KeyRelation::Relative;
+    }
+    if expected.tonic == detected.tonic && expected.mode != detected.mode {
+        return KeyRelation::Parallel;
+    }
+    if expected.mode == detected.mode && interval == 6 {
+        return KeyRelation::Tritone;
+    }
+    KeyRelation::Other
+}
+
+/// Counts of each tempo relationship over the scored tracks, plus the MIREX Accuracy 1
+/// and Accuracy 2 totals and rates.
+#[derive(Debug, Default, Serialize)]
+struct TempoTaxonomy {
+    scored_tracks: usize,
+    accuracy_1: usize,
+    accuracy_2: usize,
+    accuracy_1_rate: Option<f32>,
+    accuracy_2_rate: Option<f32>,
+    exact: usize,
+    double: usize,
+    half: usize,
+    triple: usize,
+    third: usize,
+    three_to_two: usize,
+    two_to_three: usize,
+    four_to_three: usize,
+    three_to_four: usize,
+    other: usize,
+}
+
+fn build_tempo_taxonomy(relations: &[TempoRelation]) -> TempoTaxonomy {
+    let mut taxonomy = TempoTaxonomy::default();
+    for relation in relations {
+        taxonomy.scored_tracks += 1;
+        if relation.is_accuracy_1() {
+            taxonomy.accuracy_1 += 1;
+        }
+        if relation.is_accuracy_2() {
+            taxonomy.accuracy_2 += 1;
+        }
+        match relation {
+            TempoRelation::Exact => taxonomy.exact += 1,
+            TempoRelation::Double => taxonomy.double += 1,
+            TempoRelation::Half => taxonomy.half += 1,
+            TempoRelation::Triple => taxonomy.triple += 1,
+            TempoRelation::Third => taxonomy.third += 1,
+            TempoRelation::ThreeToTwo => taxonomy.three_to_two += 1,
+            TempoRelation::TwoToThree => taxonomy.two_to_three += 1,
+            TempoRelation::FourToThree => taxonomy.four_to_three += 1,
+            TempoRelation::ThreeToFour => taxonomy.three_to_four += 1,
+            TempoRelation::Other => taxonomy.other += 1,
+        }
+    }
+    if taxonomy.scored_tracks > 0 {
+        let total = taxonomy.scored_tracks as f32;
+        taxonomy.accuracy_1_rate = Some(taxonomy.accuracy_1 as f32 / total);
+        taxonomy.accuracy_2_rate = Some(taxonomy.accuracy_2 as f32 / total);
+    }
+    taxonomy
+}
+
+/// Counts of each key relationship over the scored tracks.
+#[derive(Debug, Default, Serialize)]
+struct KeyTaxonomy {
+    scored_tracks: usize,
+    exact: usize,
+    fifth: usize,
+    relative: usize,
+    parallel: usize,
+    tritone: usize,
+    other: usize,
+}
+
+fn build_key_taxonomy(relations: &[KeyRelation]) -> KeyTaxonomy {
+    let mut taxonomy = KeyTaxonomy::default();
+    for relation in relations {
+        taxonomy.scored_tracks += 1;
+        match relation {
+            KeyRelation::Exact => taxonomy.exact += 1,
+            KeyRelation::Fifth => taxonomy.fifth += 1,
+            KeyRelation::Relative => taxonomy.relative += 1,
+            KeyRelation::Parallel => taxonomy.parallel += 1,
+            KeyRelation::Tritone => taxonomy.tritone += 1,
+            KeyRelation::Other => taxonomy.other += 1,
+        }
+    }
+    taxonomy
+}
+
+/// Classify the metrical relationship for an optional reference/detected tempo pair.
+fn metrical_relation(expected: Option<f32>, detected: Option<f32>) -> Option<TempoRelation> {
+    paired_bpm(expected, detected)
+        .map(|(expected, detected)| classify_tempo(expected, detected, TEMPO_TOLERANCE))
+}
+
+/// Classify the harmonic relationship for an optional reference/detected key pair.
+fn harmonic_relation(
+    expected: Option<MusicalKey>,
+    detected: Option<MusicalKey>,
+) -> Option<KeyRelation> {
+    expected
+        .zip(detected)
+        .map(|(expected, detected)| classify_key_relation(expected, detected))
+}
+
+/// MIREX weighted key score for an optional reference/detected key pair.
+fn mirex_of(expected: Option<MusicalKey>, detected: Option<MusicalKey>) -> Option<f32> {
+    expected
+        .zip(detected)
+        .map(|(expected, detected)| mirex_key_score(expected, detected))
 }
 
 fn tempo_segment_error(expected: &[TempoSegmentAnnotation], analysis: &Analysis) -> Option<f32> {
@@ -1394,12 +1637,21 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
         .iter()
         .filter_map(|track| track.beat_recall)
         .collect::<Vec<_>>();
+    let tempo_relations = tracks
+        .iter()
+        .filter_map(|track| track.tempo_relation)
+        .collect::<Vec<_>>();
+    let key_relations = tracks
+        .iter()
+        .filter_map(|track| track.key_relation)
+        .collect::<Vec<_>>();
 
     CorpusSummary {
         analyzed_tracks: tracks.iter().filter(|track| track.error.is_none()).count(),
         failed_tracks: tracks.iter().filter(|track| track.error.is_some()).count(),
         bpm_mean_absolute_error: mean_f32(&bpm_errors),
         bpm_octave_aware_mean_absolute_error: mean_f32(&octave_errors),
+        tempo_taxonomy: build_tempo_taxonomy(&tempo_relations),
         exact_key_accuracy: mean_f32(
             &key_matches
                 .iter()
@@ -1407,6 +1659,7 @@ fn summarize(tracks: &[TrackResult]) -> CorpusSummary {
                 .collect::<Vec<_>>(),
         ),
         mirex_weighted_score: mean_f32(&mirex_scores),
+        key_taxonomy: build_key_taxonomy(&key_relations),
         tempo_segment_mean_absolute_error: mean_f32(&segment_errors),
         key_segment_exact_accuracy: mean_f32(&key_segment_accuracies),
         beat_f1: mean_f32(&beat_f1_values),
@@ -1726,6 +1979,113 @@ mod tests {
         assert!((mirex_key_score(c_major, a_minor) - 0.3).abs() < f32::EPSILON);
         assert!((mirex_key_score(c_major, c_minor) - 0.2).abs() < f32::EPSILON);
         assert!((mirex_key_score(c_major, d_major) - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn classifies_tempo_metrical_relationships() {
+        assert_eq!(
+            classify_tempo(128.0, 128.0, TEMPO_TOLERANCE),
+            TempoRelation::Exact
+        );
+        // Four percent tolerance still counts as exact.
+        assert_eq!(
+            classify_tempo(128.0, 131.0, TEMPO_TOLERANCE),
+            TempoRelation::Exact
+        );
+        assert_eq!(
+            classify_tempo(128.0, 64.0, TEMPO_TOLERANCE),
+            TempoRelation::Half
+        );
+        assert_eq!(
+            classify_tempo(64.0, 128.0, TEMPO_TOLERANCE),
+            TempoRelation::Double
+        );
+        assert_eq!(
+            classify_tempo(150.0, 100.0, TEMPO_TOLERANCE),
+            TempoRelation::TwoToThree
+        );
+        assert_eq!(
+            classify_tempo(90.0, 120.0, TEMPO_TOLERANCE),
+            TempoRelation::FourToThree
+        );
+        assert_eq!(
+            classify_tempo(120.0, 137.0, TEMPO_TOLERANCE),
+            TempoRelation::Other
+        );
+    }
+
+    #[test]
+    fn tempo_accuracy_levels_follow_mirex_factors() {
+        assert!(TempoRelation::Exact.is_accuracy_1());
+        assert!(!TempoRelation::Double.is_accuracy_1());
+        // Accuracy 2 forgives the 1/3, 1/2, 2, 3 factors but not 3/2 or 4/3.
+        assert!(TempoRelation::Double.is_accuracy_2());
+        assert!(TempoRelation::Third.is_accuracy_2());
+        assert!(!TempoRelation::ThreeToTwo.is_accuracy_2());
+        assert!(!TempoRelation::FourToThree.is_accuracy_2());
+    }
+
+    #[test]
+    fn tempo_taxonomy_counts_and_rates() {
+        let relations = [
+            TempoRelation::Exact,
+            TempoRelation::Exact,
+            TempoRelation::Half,
+            TempoRelation::ThreeToTwo,
+        ];
+        let taxonomy = build_tempo_taxonomy(&relations);
+        assert_eq!(taxonomy.scored_tracks, 4);
+        assert_eq!(taxonomy.exact, 2);
+        assert_eq!(taxonomy.half, 1);
+        assert_eq!(taxonomy.three_to_two, 1);
+        assert_eq!(taxonomy.accuracy_1, 2);
+        assert_eq!(taxonomy.accuracy_2, 3);
+        assert!((taxonomy.accuracy_1_rate.unwrap() - 0.5).abs() < f32::EPSILON);
+        assert!((taxonomy.accuracy_2_rate.unwrap() - 0.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn classifies_key_relationships_both_fifth_directions() {
+        let c_major = MusicalKey {
+            tonic: PitchClass::C,
+            mode: Mode::Major,
+        };
+        let g_major = MusicalKey {
+            tonic: PitchClass::G,
+            mode: Mode::Major,
+        };
+        let f_major = MusicalKey {
+            tonic: PitchClass::F,
+            mode: Mode::Major,
+        };
+        let a_minor = MusicalKey {
+            tonic: PitchClass::A,
+            mode: Mode::Minor,
+        };
+        let c_minor = MusicalKey {
+            tonic: PitchClass::C,
+            mode: Mode::Minor,
+        };
+        let fsharp_major = MusicalKey {
+            tonic: PitchClass::FSharp,
+            mode: Mode::Major,
+        };
+
+        assert_eq!(classify_key_relation(c_major, c_major), KeyRelation::Exact);
+        assert_eq!(classify_key_relation(c_major, g_major), KeyRelation::Fifth);
+        assert_eq!(classify_key_relation(c_major, f_major), KeyRelation::Fifth);
+        assert_eq!(
+            classify_key_relation(c_major, a_minor),
+            KeyRelation::Relative
+        );
+        assert_eq!(
+            classify_key_relation(c_major, c_minor),
+            KeyRelation::Parallel
+        );
+        assert_eq!(
+            classify_key_relation(c_major, fsharp_major),
+            KeyRelation::Tritone
+        );
     }
 
     #[test]
