@@ -5,13 +5,13 @@ can build against while the analysis algorithms continue to improve.
 
 ## Stability model
 
-trail mix has two integration entry points.
+trail mix has two integration APIs.
 
 1. `trailmix::analyze()` accepts finite mono `f32` PCM plus a sample rate.
 2. `trailmix_codecs::analyze_path()` accepts an audio file. It decodes the file,
    preps mono PCM, and calls the same analysis core.
 
-Both entry points return an `Analysis` value that implements
+Both APIs return an `Analysis` value that implements
 [`serde::Serialize`](https://docs.rs/serde/latest/serde/trait.Serialize.html).
 Applications may store or transmit the JSON form of that value.
 
@@ -128,9 +128,9 @@ by waveform generation.
 
 Keep `analysis-v1` stable. Publish `analysis-v2` for incompatible JSON changes.
 
-Applications should treat confidence values as advisory for now. They are useful
-for ranking and UI hints, but they are not calibrated enough for hard quality
-gates.
+Applications should treat confidence values as advisory for now. They can
+support ranking and UI hints, but they are not calibrated enough for hard
+quality gates.
 
 ## Cueport integration path
 

@@ -1,10 +1,9 @@
 # Architecture
 
-**trail mix** is a Rust workspace. It accepts an audio file or mono PCM and returns
-tempo, key, beat positions, and waveform data as versioned JSON. `beat-salad`,
-`key-lime`, and `sampler-platter` are independent crates that can be used on their
-own. `trailmix` is an optional facade that runs all three and returns one combined
-result. `trailmix-codecs` handles file decoding and mono prep.
+**trail mix** is a Rust workspace for tempo, key, beat, and waveform analysis.
+`beat-salad`, `key-lime`, and `sampler-platter` are independent analyzer crates
+that can be used on their own. `trailmix` is an optional facade that runs all
+three and returns one combined result. `trailmix-codecs` handles file decoding.
 
 ## Crates
 
@@ -81,9 +80,8 @@ result. `trailmix-codecs` handles file decoding and mono prep.
     multiple segments exist.
 - `sampler-platter` bins PCM into waveform columns with raw min, max, and RMS
   values plus display-oriented height and log-spaced band-energy color hints.
-- `trailmix-codecs` provides separately selectable common-format decoders,
-  downmixes decoded channels to mono PCM, and exposes audio-file analysis
-  helpers.
+- `trailmix-codecs` provides separately selectable common-format decoders and
+  audio-file analysis helpers.
 - `trailmix-manifest` defines and validates local evaluation-corpus annotations.
 - `trailmix-datasets` imports GiantSteps Tempo v2 and GiantSteps Key reference
   annotations into the shared manifest while retaining dataset provenance.
@@ -142,7 +140,7 @@ are kept open for exploration, each required to preserve the current `Analysis`
 result shape.
 
 - An optional, feature-gated model backend for key or beat estimation, using a
-  small quantized model and a pure-Rust inference engine that still targets
+  small quantized model and a Rust inference engine that still targets
   WASM and embedded builds, so the zero-dependency core remains intact.
 - A platform-native backend where one already exists on device, selected by the
   application rather than forced by the library.

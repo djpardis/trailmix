@@ -7,9 +7,8 @@
 [![CI](https://github.com/djpardis/trailmix/actions/workflows/ci.yml/badge.svg)](https://github.com/djpardis/trailmix/actions/workflows/ci.yml)
 ![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)
 
-**trail mix** is an audio-analysis toolkit written in Rust. It accepts an
-audio file or mono PCM and returns tempo, musical key, beat positions, and
-compact waveform data as JSON.
+**trail mix** is an audio-analysis toolkit written in Rust. It produces tempo,
+musical key, beat positions, and compact waveform data as JSON.
 
 [Cueport](https://usecueport.com/) uses **trail mix** for local waveform
 and audio-analysis features, but the crates are built for any desktop, mobile,
@@ -74,9 +73,8 @@ buckets.
 - **sampler platter** generates compact waveform columns with raw min/max/RMS
   values plus optional display height and band-energy color hints.
 
-The `trailmix` crate combines the three analyzers behind one PCM-in/results-out
-API. The optional `trailmix-codecs` crate opens audio files, decodes them, preps
-mono PCM, and runs the same analysis.
+The `trailmix` crate combines the three analyzers behind one results API. The
+optional `trailmix-codecs` crate opens audio files and runs the same analysis.
 
 The workspace also includes `trailmix-cli` for command-line use,
 `trailmix-bench` for machine-readable benchmarks, `trailmix-manifest` for the
@@ -86,21 +84,20 @@ playback, annotation, and on-demand analysis.
 
 ## Design principles
 
-- **Pure Rust**: all analysis is deterministic DSP.
-- **Small binary**: all three analyzers fit in under 3 MB.
+- **Rust**: all analysis is deterministic DSP.
+- **Small binary**: all three analyzers fit in < 3 MB.
 - **Portable**: runs on ARM, x86, and WASM.
-- **Interpretable**: intermediate features (chroma vectors, onset envelopes,
-  confidence scores) are exposed.
+- **Interpretable**: intermediate features available for inspection (chroma
+  vectors, onset envelopes, confidence scores).
 
 ## Accuracy and next step
 
-Tempo, beat, and waveform analysis are reliable. Key estimation is the weakest
-of the four and is the main target for improvement.
+BPM, beat-grid, and waveform outputs are the most mature parts of the current
+implementation. Key estimation has the largest accuracy gap and is the main
+target for improvement.
 
-The next step is optional model-based or platform-native analysis that returns
-the same `Analysis` JSON, so callers can opt into higher accuracy without
-changing how they read results. The DSP core remains the default for apps that
-need local, dependency-light analysis.
+The next step is optional model-based or platform-native analysis. The DSP core
+remains the default for apps that need local, dependency-light analysis.
 
 ## License
 
