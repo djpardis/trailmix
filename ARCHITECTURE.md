@@ -1,11 +1,9 @@
 # Architecture
 
-**trail mix** is a Rust workspace. It accepts an audio file or mono PCM and returns
-tempo, key, beat positions, and waveform data as versioned JSON. `beat-salad`,
-`key-lime`, and `sampler-platter` are independent crates that can be used on their
-own. `trailmix` is an optional facade that runs all three and returns one combined
-result. `trailmix-codecs` handles file decoding and mono prep. Persistence and
-transport are caller responsibilities.
+**trail mix** is a Rust workspace for tempo, key, beat, and waveform analysis.
+`beat-salad`, `key-lime`, and `sampler-platter` are independent analyzer crates
+that can be used on their own. `trailmix` is an optional facade that runs all
+three and returns one combined result. `trailmix-codecs` handles file decoding.
 
 ## Crates
 
@@ -28,6 +26,9 @@ transport are caller responsibilities.
   - tempo estimation applies a gentle octave prior (sigma=2 octaves, centered
     on 120 BPM) to reduce half/double errors without penalizing fast tempos
     (170+ BPM).
+  - display BPM remains separate from the precise estimate. It is an integer
+    selected by fitting the floor and ceiling integer candidates around the
+    precise BPM to the detected beat positions and choosing the lower residual.
   - `BeatPosition` includes a `position_in_bar` field (1-4, assumes 4/4 meter)
     for downbeat inference.
   - an optional `onnx-beat` feature enables ONNX-based beat tracking using
@@ -62,7 +63,8 @@ transport are caller responsibilities.
     semitone resolution across all octaves.
   - Multiple key profiles: scores chroma against Krumhansl-Kessler (1982),
     Temperley (2001), EDMA (Faraldo et al. 2016), and corpus-learned profiles,
-    picking the best correlation across all candidates.
+    averaging those profile-family scores before ranking candidates. This keeps
+    one profile family from dominating close major/minor decisions by itself.
   - Tuning estimation: detects sub-semitone pitch offset and shifts chroma
     before classification.
   - Median chroma aggregation: global chroma takes the per-pitch-class median
@@ -76,10 +78,10 @@ transport are caller responsibilities.
     do not create segment boundaries; short segments merge into neighbors.
   - Segment-majority voting: global key uses the longest segment's key when
     multiple segments exist.
-- `sampler-platter` bins PCM into min, max, and RMS waveform columns.
-- `trailmix-codecs` provides separately selectable common-format decoders,
-  downmixes decoded channels to mono PCM, and exposes audio-file analysis
-  helpers.
+- `sampler-platter` bins PCM into waveform columns with raw min, max, and RMS
+  values plus display-oriented height and log-spaced band-energy color hints.
+- `trailmix-codecs` provides separately selectable common-format decoders and
+  audio-file analysis helpers.
 - `trailmix-manifest` defines and validates local evaluation-corpus annotations.
 - `trailmix-datasets` imports GiantSteps Tempo v2 and GiantSteps Key reference
   annotations into the shared manifest while retaining dataset provenance.
@@ -138,7 +140,7 @@ are kept open for exploration, each required to preserve the current `Analysis`
 result shape.
 
 - An optional, feature-gated model backend for key or beat estimation, using a
-  small quantized model and a pure-Rust inference engine that still targets
+  small quantized model and a Rust inference engine that still targets
   WASM and embedded builds, so the zero-dependency core remains intact.
 - A platform-native backend where one already exists on device, selected by the
   application rather than forced by the library.

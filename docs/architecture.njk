@@ -73,10 +73,10 @@ permalink: architecture/index.html
           </section>
 
           <article>
-            <h2>Two entry points</h2>
-            <p><code>trailmix_codecs::analyze_path()</code> accepts an audio file and handles decoding, mono PCM prep, and analysis.
-            <code>trailmix::analyze()</code> accepts mono PCM directly.
-            Both return the same <code>Analysis</code> JSON.</p>
+            <h2>Audio input APIs</h2>
+            <p><code>trailmix_codecs::analyze_path()</code> starts from an audio file and handles decoding.
+            <code>trailmix::analyze()</code> starts from mono PCM supplied by the application.
+            Both produce the same <code>Analysis</code> result.</p>
           </article>
 
           <article>
@@ -98,14 +98,7 @@ permalink: architecture/index.html
 
         </div>
 
-        <div class="col-side" aria-labelledby="analyzers-title">
-
-          <div class="col-side-intro">
-            <h2 id="analyzers-title">Analyzer crates</h2>
-            <p>Each crate performs one analysis task and can be used on its own.
-            The <strong class="project-name">trail mix</strong> facade runs all
-            three and returns one combined result.</p>
-          </div>
+        <div class="col-side">
 
           <article class="analyzer-card">
             <img src="/assets/beat-salad-card.png" alt="" class="analyzer-logo" width="80" height="80">
@@ -132,7 +125,7 @@ permalink: architecture/index.html
               </a>
             </h3>
             <p>Estimates global and local major or minor keys with dual chroma
-            extraction, multiple key profiles, median aggregation, and
+            extraction, averaged key-profile scores, median aggregation, and
             confidence-gated segmentation.</p>
             <dl class="analyzer-facts">
               <div><dt>returns</dt><dd>Key, confidence, key segments</dd></div>
@@ -147,9 +140,9 @@ permalink: architecture/index.html
                 <svg class="crate-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/></svg>
               </a>
             </h3>
-            <p>Generates compact min, max, and RMS waveform columns for display.</p>
+            <p>Generates compact waveform columns with raw min, max, and RMS values plus display height and band-energy color hints.</p>
             <dl class="analyzer-facts">
-              <div><dt>returns</dt><dd>Min, max, RMS waveform columns</dd></div>
+              <div><dt>returns</dt><dd>Waveform columns with raw values and display hints</dd></div>
             </dl>
           </article>
 

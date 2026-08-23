@@ -11,7 +11,7 @@ default = []
 common-codecs = ["aiff", "flac", "mp3", "mp4", "wav"]
 aiff = ["symphonia/aiff", "symphonia/pcm"]
 flac = ["symphonia/flac"]
-mp3 = ["symphonia/mp3"]
+mp3 = ["symphonia/mpa", "symphonia/id3v1", "symphonia/id3v2"]
 mp4 = ["symphonia/aac", "symphonia/alac", "symphonia/isomp4"]
 wav = ["symphonia/pcm", "symphonia/wav"]
 

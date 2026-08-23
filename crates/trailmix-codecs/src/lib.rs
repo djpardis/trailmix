@@ -305,4 +305,19 @@ mod tests {
         assert!((analysis.duration_seconds - 1.0).abs() < 0.001);
         assert_eq!(analysis.waveform.columns.len(), 64);
     }
+
+    #[cfg(feature = "mp3")]
+    #[test]
+    fn decodes_id3v2_tagged_mp3() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("id3v2-sine.mp3");
+
+        let decoded = decode_file(path).expect("decode ID3v2-tagged MP3");
+
+        assert_eq!(decoded.sample_rate, 44_100);
+        assert_eq!(decoded.source_channels, 2);
+        assert!(!decoded.samples.is_empty());
+    }
 }

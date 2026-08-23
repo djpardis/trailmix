@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/djpardis/trailmix/schemas/analysis-v1.schema.json",
-  "title": "Trail Mix analysis v1",
+  "title": "trail mix analysis v1",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "duration_seconds", "beat", "key", "waveform"],
@@ -19,6 +19,8 @@
       "required": [
         "version",
         "global_bpm",
+        "display_bpm",
+        "display_bpm_decimals",
         "confidence",
         "beats",
         "tempo_segments",
@@ -27,9 +29,17 @@
         "alternate_coverage"
       ],
       "properties": {
-        "version": { "const": 3 },
+        "version": { "const": 4 },
         "global_bpm": {
           "anyOf": [{ "type": "number" }, { "type": "null" }]
+        },
+        "display_bpm": {
+          "anyOf": [{ "type": "number" }, { "type": "null" }]
+        },
+        "display_bpm_decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 0
         },
         "confidence": { "type": "number" },
         "beats": {
@@ -176,7 +186,9 @@
       "properties": {
         "min": { "type": "number" },
         "max": { "type": "number" },
-        "rms": { "type": "number", "minimum": 0 }
+        "rms": { "type": "number", "minimum": 0 },
+        "display_height": { "type": "number", "minimum": 0, "maximum": 1 },
+        "spectral_centroid": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     }
   }
