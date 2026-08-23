@@ -26,6 +26,12 @@ pub struct TempoSegment {
 pub struct BeatAnalysis {
     pub version: u32,
     pub global_bpm: Option<f32>,
+    /// Tempo rounded for library display. This never replaces `global_bpm`,
+    /// which remains the precise analyzer result for beatgrid math.
+    pub display_bpm: Option<f32>,
+    /// Number of decimal places the display BPM needs. Integer-like tempos use
+    /// zero decimals; fractional estimates use one decimal.
+    pub display_bpm_decimals: u8,
     pub confidence: f32,
     pub beats: Vec<BeatPosition>,
     pub tempo_segments: Vec<TempoSegment>,
@@ -112,8 +118,10 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: BeatConfig) -> BeatAna
     );
 
     BeatAnalysis {
-        version: 3,
+        version: 4,
         global_bpm: Some(global.bpm),
+        display_bpm: Some(display_bpm(global.bpm, &beats)),
+        display_bpm_decimals: 0,
         confidence: global.confidence,
         beats,
         tempo_segments,
@@ -125,8 +133,10 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: BeatConfig) -> BeatAna
 
 fn empty_analysis() -> BeatAnalysis {
     BeatAnalysis {
-        version: 3,
+        version: 4,
         global_bpm: None,
+        display_bpm: None,
+        display_bpm_decimals: 0,
         confidence: 0.0,
         beats: Vec::new(),
         tempo_segments: Vec::new(),
@@ -139,6 +149,56 @@ fn empty_analysis() -> BeatAnalysis {
 fn bpm_matches(left: f32, right: f32, change_ratio: f32) -> bool {
     let scale = left.abs().max(right.abs()).max(f32::EPSILON);
     (left - right).abs() / scale <= change_ratio
+}
+
+fn display_bpm(bpm: f32, beats: &[BeatPosition]) -> f32 {
+    let lower = bpm.floor().max(1.0);
+    let upper = bpm.ceil().max(lower);
+    let nearest = bpm.round().max(1.0);
+    if beats.len() < 4 {
+        return nearest;
+    }
+
+    [lower, upper]
+        .into_iter()
+        .min_by(|left, right| {
+            let left_error = beat_grid_fit_error(*left, beats);
+            let right_error = beat_grid_fit_error(*right, beats);
+            left_error
+                .total_cmp(&right_error)
+                .then_with(|| (left - bpm).abs().total_cmp(&(right - bpm).abs()))
+        })
+        .unwrap_or(nearest)
+}
+
+fn beat_grid_fit_error(bpm: f32, beats: &[BeatPosition]) -> f64 {
+    if bpm <= 0.0 || beats.len() < 2 {
+        return f64::INFINITY;
+    }
+    let period = 60.0 / f64::from(bpm);
+    let mut offsets = beats
+        .iter()
+        .enumerate()
+        .map(|(idx, beat)| beat.time_seconds - idx as f64 * period)
+        .collect::<Vec<_>>();
+    let offset = median_f64(&mut offsets);
+    beats
+        .iter()
+        .enumerate()
+        .map(|(idx, beat)| {
+            let expected = offset + idx as f64 * period;
+            (beat.time_seconds - expected).abs()
+        })
+        .sum::<f64>()
+        / beats.len() as f64
+}
+
+fn median_f64(values: &mut [f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.sort_by(f64::total_cmp);
+    values[values.len() / 2]
 }
 
 /// Longest secondary tempo cluster by duration, if it covers enough of the track.
@@ -346,7 +406,7 @@ fn estimate_tempo(
         candidates.push((lag, score));
     }
 
-    // Sub-harmonic resolution: if the best candidate is fast (>160 BPM) and a
+    // Sub-harmonic resolution: if the best candidate is fast (>135 BPM) and a
     // candidate at 2/3 or 3/4 of that BPM has good support, prefer the slower one.
     let &(best_lag, best_score) = candidates
         .iter()
@@ -394,7 +454,7 @@ fn resolve_fast_tempo_subharmonic(
     max_lag: usize,
     candidates: &[(usize, f32)],
 ) -> usize {
-    if best_bpm <= 160.0 {
+    if best_bpm <= 135.0 {
         return best_lag;
     }
 
@@ -743,6 +803,17 @@ mod tests {
         onset
     }
 
+    fn regular_beats(bpm: f32, count: usize) -> Vec<BeatPosition> {
+        let interval = 60.0 / f64::from(bpm);
+        (0..count)
+            .map(|idx| BeatPosition {
+                time_seconds: idx as f64 * interval,
+                confidence: 1.0,
+                position_in_bar: (idx % 4 + 1) as u8,
+            })
+            .collect()
+    }
+
     #[test]
     fn detects_a_120_bpm_click_track() {
         let samples = click_track(120.0, 20.0, 44_100);
@@ -848,6 +919,34 @@ mod tests {
         let result = analyze(&samples, 44_100, config);
         assert!(!result.multi_tempo);
         assert_eq!(result.alternate_bpm, None);
+    }
+
+    #[test]
+    fn display_bpm_uses_the_integer_tempo_that_best_fits_beats() {
+        let beats = regular_beats(122.0, 64);
+        assert_eq!(display_bpm(122.596, &beats), 122.0);
+    }
+
+    #[test]
+    fn display_bpm_can_choose_the_upper_integer() {
+        let beats = regular_beats(123.0, 64);
+        assert_eq!(display_bpm(122.596, &beats), 123.0);
+    }
+
+    #[test]
+    fn resolves_supported_four_three_alias_below_160_bpm() {
+        let chosen =
+            resolve_fast_tempo_subharmonic(30, 1.0, 144.0, 20, 80, &[(30, 1.0), (40, 0.92)]);
+
+        assert_eq!(chosen, 40);
+    }
+
+    #[test]
+    fn keeps_midtempo_candidate_without_subharmonic_support() {
+        let chosen =
+            resolve_fast_tempo_subharmonic(32, 1.0, 135.0, 20, 80, &[(32, 1.0), (42, 0.55)]);
+
+        assert_eq!(chosen, 32);
     }
 
     #[test]

@@ -123,7 +123,7 @@ pub struct SeratoObservation {
 
 /// Results exported by Apple's Music Understanding framework for comparison.
 ///
-/// These are external observations, not Trail Mix annotations or predictions.
+/// These are external observations, not trail mix annotations or predictions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct AppleMusicUnderstandingObservation {
     #[serde(default, skip_serializing_if = "Option::is_none")]

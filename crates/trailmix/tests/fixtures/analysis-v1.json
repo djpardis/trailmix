@@ -2,8 +2,10 @@
   "version": 1,
   "duration_seconds": 12.5,
   "beat": {
-    "version": 3,
+    "version": 4,
     "global_bpm": 124.0,
+    "display_bpm": 124.0,
+    "display_bpm_decimals": 0,
     "confidence": 0.75,
     "beats": [
       {

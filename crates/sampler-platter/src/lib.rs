@@ -11,6 +11,12 @@ pub struct WaveformColumn {
     pub max: f32,
     /// Root mean square energy in the column.
     pub rms: f32,
+    /// Display-oriented waveform height after track-level normalization.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_height: Option<f32>,
+    /// Approximate spectral balance, where 0 is bass-heavy and 1 is treble-heavy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spectral_centroid: Option<f32>,
 }
 
 /// A versioned waveform overview generated from mono PCM.
@@ -78,14 +84,151 @@ pub fn generate_overview(
             min,
             max,
             rms: (sum_squares / window.len() as f64).sqrt() as f32,
+            display_height: None,
+            spectral_centroid: Some(spectral_balance(window, sample_rate)),
         });
     }
+
+    apply_display_heights(&mut columns);
 
     WaveformOverview {
         version: 1,
         sample_rate,
         source_samples: samples.len(),
         columns,
+    }
+}
+
+fn apply_display_heights(columns: &mut [WaveformColumn]) {
+    let energies = columns
+        .iter()
+        .map(|column| {
+            let peak = column.min.abs().max(column.max.abs());
+            if peak <= f32::EPSILON || column.rms <= f32::EPSILON {
+                0.0
+            } else {
+                // The geometric mean keeps peak transients visible while
+                // preserving RMS-driven differences inside dense music.
+                (peak * column.rms).sqrt()
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let max_energy = energies.iter().copied().fold(0.0_f32, f32::max);
+    if max_energy <= f32::EPSILON {
+        for column in columns {
+            column.display_height = Some(0.0);
+        }
+        return;
+    }
+
+    let display_ceiling = percentile(energies.clone(), 0.95).max(max_energy * 0.5);
+
+    for (column, energy) in columns.iter_mut().zip(energies) {
+        column.display_height = Some(if energy <= f32::EPSILON {
+            0.0
+        } else {
+            (energy / display_ceiling).clamp(0.0, 1.0).powf(0.60)
+        });
+    }
+}
+
+fn percentile(mut values: Vec<f32>, p: f32) -> f32 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.sort_by(f32::total_cmp);
+    let idx = ((values.len() - 1) as f32 * p.clamp(0.0, 1.0)).round() as usize;
+    values[idx]
+}
+
+fn spectral_balance(window: &[f32], sample_rate: u32) -> f32 {
+    const BAND_COUNT: usize = 8;
+
+    if window.len() < 2 {
+        return 0.5;
+    }
+    if sample_rate == 0 {
+        return time_domain_spectral_balance(window);
+    }
+
+    let nyquist = sample_rate as f32 / 2.0;
+    let max_freq = nyquist.clamp(80.0, 10_000.0);
+    if max_freq <= 80.0 {
+        return time_domain_spectral_balance(window);
+    }
+
+    let mut total = 0.0_f64;
+    let mut weighted = 0.0_f64;
+    for band in 0..BAND_COUNT {
+        let pos = band as f32 / (BAND_COUNT - 1) as f32;
+        let freq = 80.0 * (max_freq / 80.0).powf(pos);
+        let energy = goertzel_energy(window, sample_rate, freq);
+        total += energy;
+        weighted += energy * f64::from(pos);
+    }
+
+    if total > f64::EPSILON {
+        return (weighted / total).clamp(0.0, 1.0) as f32;
+    }
+
+    time_domain_spectral_balance(window)
+}
+
+fn goertzel_energy(window: &[f32], sample_rate: u32, freq: f32) -> f64 {
+    let omega = 2.0 * std::f32::consts::PI * freq / sample_rate as f32;
+    let coeff = 2.0 * omega.cos();
+    let mut previous = 0.0_f32;
+    let mut previous_previous = 0.0_f32;
+    let denom = (window.len().saturating_sub(1)).max(1) as f32;
+
+    for (idx, &raw_sample) in window.iter().enumerate() {
+        let phase = idx as f32 / denom;
+        let win = 0.5 - 0.5 * (2.0 * std::f32::consts::PI * phase).cos();
+        let sample = sanitize_sample(raw_sample) * win;
+        let current = sample + coeff * previous - previous_previous;
+        previous_previous = previous;
+        previous = current;
+    }
+
+    f64::from(
+        (previous_previous * previous_previous + previous * previous
+            - coeff * previous * previous_previous)
+            .max(0.0),
+    )
+}
+
+fn time_domain_spectral_balance(window: &[f32]) -> f32 {
+    let mut abs_sum = 0.0_f64;
+    let mut delta_sum = 0.0_f64;
+    let mut zero_crossings = 0usize;
+    let mut previous = sanitize_sample(window[0]);
+
+    abs_sum += f64::from(previous.abs());
+    for &raw_sample in &window[1..] {
+        let sample = sanitize_sample(raw_sample);
+        abs_sum += f64::from(sample.abs());
+        delta_sum += f64::from((sample - previous).abs());
+        if (previous < 0.0 && sample >= 0.0) || (previous >= 0.0 && sample < 0.0) {
+            zero_crossings += 1;
+        }
+        previous = sample;
+    }
+
+    if abs_sum <= f64::EPSILON {
+        return 0.5;
+    }
+
+    let derivative_ratio = (delta_sum / (abs_sum * 2.0)).clamp(0.0, 1.0);
+    let zero_crossing_ratio = (zero_crossings as f64 / (window.len() - 1) as f64).clamp(0.0, 1.0);
+    (derivative_ratio.mul_add(0.7, zero_crossing_ratio * 0.3) as f32).clamp(0.0, 1.0)
+}
+
+fn sanitize_sample(raw_sample: f32) -> f32 {
+    if raw_sample.is_finite() {
+        raw_sample.clamp(-1.0, 1.0)
+    } else {
+        0.0
     }
 }
 
@@ -101,6 +244,7 @@ mod tests {
         assert_eq!(overview.columns[0].min, -1.0);
         assert_eq!(overview.columns[0].max, 1.0);
         assert!((overview.columns[0].rms - 1.0).abs() < f32::EPSILON);
+        assert!(overview.columns[0].spectral_centroid.is_some());
         assert!((overview.duration_seconds() - 1.0).abs() < f64::EPSILON);
     }
 
@@ -115,7 +259,64 @@ mod tests {
                 min: 0.0,
                 max: 0.0,
                 rms: 0.0,
+                display_height: Some(0.0),
+                spectral_centroid: Some(0.5),
             }
         );
+    }
+
+    #[test]
+    fn display_height_boosts_quiet_columns_without_clipping_loud_columns() {
+        let overview = generate_overview(&[-0.02, 0.02, -1.0, 1.0], 4, 2);
+        let quiet = overview.columns[0].display_height.unwrap();
+        let loud = overview.columns[1].display_height.unwrap();
+
+        assert!(quiet > 0.02);
+        assert!(quiet < 0.5);
+        assert!(quiet < loud);
+        assert!(loud <= 1.0);
+    }
+
+    #[test]
+    fn display_height_is_monotonic_with_signal_level() {
+        let overview = generate_overview(&[-0.1, 0.1, -0.25, 0.25, -0.5, 0.5, -1.0, 1.0], 8, 4);
+        let heights = overview
+            .columns
+            .iter()
+            .map(|column| column.display_height.unwrap())
+            .collect::<Vec<_>>();
+
+        assert!(heights.windows(2).all(|pair| pair[0] < pair[1]));
+    }
+
+    #[test]
+    fn spectral_balance_rises_with_fast_changes() {
+        let slow = generate_overview(&[-1.0; 64], 44_100, 1);
+        let fast_samples = (0..64)
+            .map(|index| if index % 2 == 0 { -1.0 } else { 1.0 })
+            .collect::<Vec<_>>();
+        let fast = generate_overview(&fast_samples, 44_100, 1);
+
+        assert!(
+            fast.columns[0].spectral_centroid.unwrap() > slow.columns[0].spectral_centroid.unwrap()
+        );
+    }
+
+    #[test]
+    fn spectral_balance_uses_frequency_energy() {
+        let sample_rate = 44_100;
+        let low = sine_wave(120.0, sample_rate, 4_096);
+        let high = sine_wave(5_000.0, sample_rate, 4_096);
+
+        assert!(spectral_balance(&high, sample_rate) > spectral_balance(&low, sample_rate));
+    }
+
+    fn sine_wave(frequency: f32, sample_rate: u32, len: usize) -> Vec<f32> {
+        (0..len)
+            .map(|index| {
+                (2.0 * std::f32::consts::PI * frequency * index as f32 / sample_rate as f32).sin()
+                    * 0.5
+            })
+            .collect()
     }
 }
