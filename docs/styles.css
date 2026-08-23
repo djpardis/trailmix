@@ -81,9 +81,8 @@ code,
 }
 
 .header-inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 64px;
+  display: flex;
+  gap: 32px;
   align-items: center;
   height: 100%;
 }
@@ -162,8 +161,7 @@ code,
 }
 
 .header-inner nav {
-  justify-self: end;
-  padding-right: 13px;
+  padding-right: 0;
 }
 
 .nav-link:hover,
