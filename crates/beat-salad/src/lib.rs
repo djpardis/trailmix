@@ -1,7 +1,5 @@
 //! Lightweight beat, tempo, and tempo-segment analysis.
 
-#[cfg(feature = "onnx-beat")]
-pub mod onnx_beat;
 pub mod spectrogram;
 
 use serde::{Deserialize, Serialize};

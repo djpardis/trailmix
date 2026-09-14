@@ -114,6 +114,7 @@ struct TrackResult {
     key_relation: Option<KeyRelation>,
     tempo_segment_mean_absolute_error: Option<f32>,
     key_segment_exact_accuracy: Option<f32>,
+    detected_key_segments: Vec<DetectedKeySegment>,
     beat_f1: Option<f32>,
     beat_precision: Option<f32>,
     beat_recall: Option<f32>,
@@ -136,6 +137,14 @@ struct TrackResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     chroma: Option<[f32; 12]>,
     error: Option<String>,
+}
+
+#[derive(Serialize)]
+struct DetectedKeySegment {
+    start_seconds: f64,
+    end_seconds: f64,
+    key: String,
+    confidence: f32,
 }
 
 #[derive(Serialize)]
@@ -213,7 +222,8 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut limit: Option<usize> = None;
     let mut parallel = false;
     let mut fast = false;
-    let mut onnx_beats_path: Option<&str> = None;
+    let mut key_segment_confidence: Option<f32> = None;
+    let mut key_minimum_segment_seconds: Option<f32> = None;
     let mut cueport_db: Option<&str> = None;
     let mut cueport_serato_folder: Option<&str> = None;
     let mut jsonl_path: Option<&str> = None;
@@ -235,12 +245,20 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
             "--parallel" => parallel = true,
             "--fast" => fast = true,
-            "--onnx-beats" => {
+            "--key-segment-confidence" => {
                 i += 1;
-                onnx_beats_path = Some(
+                key_segment_confidence = Some(
                     args.get(i)
-                        .map(String::as_str)
-                        .ok_or("--onnx-beats requires a model path")?,
+                        .ok_or("--key-segment-confidence requires a number")?
+                        .parse::<f32>()?,
+                );
+            }
+            "--key-minimum-seconds" => {
+                i += 1;
+                key_minimum_segment_seconds = Some(
+                    args.get(i)
+                        .ok_or("--key-minimum-seconds requires a number")?
+                        .parse::<f32>()?,
                 );
             }
             "--cueport-db" => {
@@ -278,7 +296,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                 limit,
                 parallel,
                 fast,
-                onnx_beats_path,
+                key_segment_confidence,
+                key_minimum_segment_seconds,
             )?)?,
         }
     };
@@ -287,7 +306,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 }
 
 fn usage() -> String {
-    "usage: trailmix-bench [--manifest <path>] [--limit N] [--parallel] [--fast] [--onnx-beats <model>] [--cueport-db <cueport.db> --cueport-serato-folder <folder> [--jsonl <path>]]".into()
+    "usage: trailmix-bench [--manifest <path>] [--limit N] [--parallel] [--fast] [--key-segment-confidence <value>] [--key-minimum-seconds <value>] [--cueport-db <cueport.db> --cueport-serato-folder <folder> [--jsonl <path>]]".into()
 }
 
 fn run_cueport_serato_folder(
@@ -681,23 +700,11 @@ fn run_manifest(
     limit: Option<usize>,
     parallel: bool,
     fast: bool,
-    onnx_beats_path: Option<&str>,
+    key_segment_confidence: Option<f32>,
+    key_minimum_segment_seconds: Option<f32>,
 ) -> Result<CorpusBenchmark, Box<dyn Error>> {
     let manifest = trailmix_manifest::load(path)?;
     let base_directory = path.parent().unwrap_or_else(|| Path::new("."));
-
-    // Load ONNX session once if requested
-    let onnx_session: Option<std::sync::Arc<std::sync::Mutex<ort::session::Session>>> =
-        match onnx_beats_path {
-            Some(model_path) => {
-                let session = ort::session::Session::builder()
-                    .map_err(|e| format!("ort session builder: {e}"))?
-                    .commit_from_file(model_path)
-                    .map_err(|e| format!("loading ONNX model {model_path}: {e}"))?;
-                Some(std::sync::Arc::new(std::sync::Mutex::new(session)))
-            }
-            None => None,
-        };
 
     let track_slice: &[TrackAnnotation] = match limit {
         Some(n) => &manifest.tracks[..n.min(manifest.tracks.len())],
@@ -705,40 +712,26 @@ fn run_manifest(
     };
 
     let analyze_fn = |track: &TrackAnnotation| {
-        let mut result = if fast {
-            analyze_manifest_track_fast(track, base_directory)
+        if fast {
+            analyze_manifest_track_fast(
+                track,
+                base_directory,
+                key_segment_confidence,
+                key_minimum_segment_seconds,
+            )
         } else {
-            analyze_manifest_track(track, base_directory)
-        };
-
-        // If ONNX beats requested, re-run beat detection with the model
-        if let Some(ref session_arc) = onnx_session {
-            if result.beat_f1.is_none() || result.expected_bpm.is_some() {
-                if let Ok(decoded) = decode_track(track, base_directory) {
-                    let config = beat_salad::onnx_beat::OnnxBeatConfig::beat_this();
-                    let mut session = session_arc.lock().unwrap();
-                    if let Ok(beats) = beat_salad::onnx_beat::track_beats(
-                        &mut session,
-                        &decoded.samples,
-                        decoded.sample_rate,
-                        &config,
-                    ) {
-                        let beat_scores = beat_position_f1(&track.expected_beats, &beats, 0.070);
-                        result.beat_f1 = beat_scores.map(|s| s.f1);
-                        result.beat_precision = beat_scores.map(|s| s.precision);
-                        result.beat_recall = beat_scores.map(|s| s.recall);
-                    }
-                }
-            }
+            analyze_manifest_track(
+                track,
+                base_directory,
+                key_segment_confidence,
+                key_minimum_segment_seconds,
+            )
         }
-
-        result
     };
 
-    let tracks: Vec<TrackResult> = if parallel && onnx_session.is_none() {
+    let tracks: Vec<TrackResult> = if parallel {
         track_slice.par_iter().map(analyze_fn).collect()
     } else {
-        // ONNX session is behind a Mutex; sequential is simpler and avoids contention
         track_slice.iter().map(analyze_fn).collect()
     };
 
@@ -797,7 +790,13 @@ fn measure_analyzers(samples: &[f32], sample_rate: u32, config: AnalysisConfig) 
     }
 }
 
-fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> TrackResult {
+#[allow(clippy::too_many_lines)]
+fn analyze_manifest_track(
+    track: &TrackAnnotation,
+    base_directory: &Path,
+    key_segment_confidence: Option<f32>,
+    key_minimum_segment_seconds: Option<f32>,
+) -> TrackResult {
     let path = if track.path.is_absolute() {
         track.path.clone()
     } else {
@@ -809,7 +808,7 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
         Err(error) => return failed_track(track, error.to_string()),
     };
     let decode_milliseconds = decode_started.elapsed().as_secs_f64() * 1_000.0;
-    let config = AnalysisConfig::default();
+    let config = analysis_config(key_segment_confidence, key_minimum_segment_seconds);
     let timings = measure_analyzers(&decoded.samples, decoded.sample_rate, config);
     let analysis = trailmix::analyze(
         AudioBuffer {
@@ -870,6 +869,7 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
             &analysis,
         ),
         key_segment_exact_accuracy,
+        detected_key_segments: serialize_key_segments(&analysis.key.segments),
         beat_f1: beat_scores.map(|scores| scores.f1),
         beat_precision: beat_scores.map(|scores| scores.precision),
         beat_recall: beat_scores.map(|scores| scores.recall),
@@ -903,12 +903,17 @@ fn analyze_manifest_track(track: &TrackAnnotation, base_directory: &Path) -> Tra
 }
 
 /// Single-pass analysis without warmup or repeated timing. Used with --fast.
-fn analyze_manifest_track_fast(track: &TrackAnnotation, base_directory: &Path) -> TrackResult {
+fn analyze_manifest_track_fast(
+    track: &TrackAnnotation,
+    base_directory: &Path,
+    key_segment_confidence: Option<f32>,
+    key_minimum_segment_seconds: Option<f32>,
+) -> TrackResult {
     let decoded = match decode_track(track, base_directory) {
         Ok(d) => d,
         Err(error) => return failed_track(track, error),
     };
-    let config = AnalysisConfig::default();
+    let config = analysis_config(key_segment_confidence, key_minimum_segment_seconds);
     let analysis = trailmix::analyze(
         AudioBuffer {
             samples: &decoded.samples,
@@ -967,6 +972,7 @@ fn analyze_manifest_track_fast(track: &TrackAnnotation, base_directory: &Path) -
             &analysis,
         ),
         key_segment_exact_accuracy,
+        detected_key_segments: serialize_key_segments(&analysis.key.segments),
         beat_f1: beat_scores.map(|scores| scores.f1),
         beat_precision: beat_scores.map(|scores| scores.precision),
         beat_recall: beat_scores.map(|scores| scores.recall),
@@ -1033,6 +1039,7 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         key_relation: None,
         tempo_segment_mean_absolute_error: None,
         key_segment_exact_accuracy: None,
+        detected_key_segments: Vec::new(),
         beat_f1: None,
         beat_precision: None,
         beat_recall: None,
@@ -1065,6 +1072,32 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
 
 fn paired_bpm(expected: Option<f32>, detected: Option<f32>) -> Option<(f32, f32)> {
     expected.zip(detected)
+}
+
+fn analysis_config(
+    key_segment_confidence: Option<f32>,
+    key_minimum_segment_seconds: Option<f32>,
+) -> AnalysisConfig {
+    let mut config = AnalysisConfig::default();
+    if let Some(value) = key_segment_confidence {
+        config.key.segment_confidence_threshold = value;
+    }
+    if let Some(value) = key_minimum_segment_seconds {
+        config.key.minimum_segment_seconds = value;
+    }
+    config
+}
+
+fn serialize_key_segments(segments: &[trailmix::KeySegment]) -> Vec<DetectedKeySegment> {
+    segments
+        .iter()
+        .map(|segment| DetectedKeySegment {
+            start_seconds: segment.start_seconds,
+            end_seconds: segment.end_seconds,
+            key: segment.key.to_string(),
+            confidence: segment.confidence,
+        })
+        .collect()
 }
 
 fn octave_aware_error(expected: f32, detected: f32) -> f32 {
@@ -2170,7 +2203,8 @@ mod tests {
         )
         .expect("write manifest");
 
-        let report = run_manifest(&manifest_path, None, false, false, None).expect("run benchmark");
+        let report =
+            run_manifest(&manifest_path, None, false, false, None, None).expect("run benchmark");
         fs::remove_dir_all(directory).expect("remove fixtures");
 
         assert_eq!(report.summary.analyzed_tracks, 1);
