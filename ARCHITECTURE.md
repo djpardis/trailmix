@@ -31,13 +31,6 @@ three and returns one combined result. `trailmix-codecs` handles file decoding.
     precise BPM to the detected beat positions and choosing the lower residual.
   - `BeatPosition` includes a `position_in_bar` field (1-4, assumes 4/4 meter)
     for downbeat inference.
-  - an optional `onnx-beat` feature enables ONNX-based beat tracking using
-    external models for development comparison only. It is not used in
-    production: the external model requires a large runtime dependency, cannot
-    target WASM or embedded platforms, and does not align with the project's
-    goal of lightweight, self-contained DSP. The feature exists so that
-    `trailmix-bench` can measure how the heuristic pipeline compares with
-    neural approaches on the same corpus.
 - Apple comparison reference: Apple's Music Understanding framework, introduced
   at WWDC 2026, provides on-device analysis for key, rhythm, beats, bars, tempo,
   structure, pace, instrument activity, and loudness without requiring an
@@ -85,6 +78,9 @@ three and returns one combined result. `trailmix-codecs` handles file decoding.
 - `trailmix-manifest` defines and validates local evaluation-corpus annotations.
 - `trailmix-datasets` imports GiantSteps Tempo v2 and GiantSteps Key reference
   annotations into the shared manifest while retaining dataset provenance.
+- `trailmix-models` defines first-party learned backend contracts and artifact
+  metadata requirements. It does not include model weights, conversion scripts,
+  or a third-party inference runtime.
 - `trailmix-cli` analyzes one supported audio file for manual evaluation.
 - `trailmix-bench` emits machine-readable synthetic or manifest-driven
   real-track benchmark results.
@@ -148,6 +144,15 @@ result shape.
 
 The point of comparison is the benchmark corpus: any backend earns its place by
 measured accuracy against the same references, not by default.
+
+`BACKENDS.md` defines the standing boundary between the default DSP path,
+first-party learned backends, and external model baselines. First-party model
+work belongs in `trailmix-models`. External projects remain benchmark
+baselines with recorded source revisions, artifact hashes, license terms, and
+training disclosures. A model backend must report accuracy, per-track runtime,
+throughput, checkpoint size, runtime dependency size, output JSON size,
+hardware support, and license terms before it changes the production
+recommendation.
 
 ## References
 

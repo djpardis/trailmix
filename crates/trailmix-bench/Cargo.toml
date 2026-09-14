@@ -11,9 +11,8 @@ default = []
 cueport-db = ["dep:rusqlite"]
 
 [dependencies]
-beat-salad = { path = "../beat-salad", features = ["onnx-beat"] }
+beat-salad = { path = "../beat-salad" }
 key-lime = { path = "../key-lime" }
-ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "download-binaries", "tls-rustls"] }
 rayon = "1"
 rusqlite = { version = "0.40.2", optional = true, features = ["bundled"] }
 sampler-platter = { path = "../sampler-platter" }

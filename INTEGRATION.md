@@ -20,6 +20,15 @@ DSP implementation. Algorithm improvements may change estimates and confidence
 values without changing the JSON schema. The current wire contract is
 `analysis-v1`.
 
+The default integration path uses the deterministic DSP backend. First-party
+transformer or foundation-model work belongs in `trailmix-models` and can
+develop in parallel. Cueport can continue to ship the default DSP build and
+store the same `analysis-v1` JSON without bundling model checkpoints.
+
+External projects are benchmark baselines unless their provenance, license
+terms, artifact hashes, runtime, and output conversion have been reviewed for a
+specific integration.
+
 ## Input
 
 Call `trailmix::analyze()` with:
@@ -138,6 +147,11 @@ The stable Cueport integration remains a thin Swift/FFI binding that accepts
 mono `Float32` PCM plus a sample rate and returns `Analysis` JSON. When a Rust
 desktop or server component can give trail mix the audio file, it may instead
 call `trailmix_codecs::analyze_path()` and serialize the returned `Analysis` as
+`analysis-v1`.
+
+If Cueport later chooses a transformer or platform-native backend, that choice
+should be caller-supplied configuration. The stored JSON shape should remain
+the same unless the backend requires a new field that cannot be represented in
 `analysis-v1`.
 
 Cueport should own:

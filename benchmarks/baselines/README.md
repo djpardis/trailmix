@@ -10,6 +10,9 @@ corpus was sealed before evaluation.
 
 The tools are evaluation-only dependencies. trail mix does not link to or copy
 their source code.
+First-party learned backend work lives in `trailmix-models`. External model
+code and weights remain outside the Rust workspace unless a backend has a
+separate provenance, license, artifact, and integration review.
 
 ## Python environment
 

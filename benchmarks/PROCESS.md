@@ -58,6 +58,13 @@ uv run --project benchmarks/baselines python benchmarks/corpus_policy.py consume
 
 ## Model gate
 
+First-party model backends live in `trailmix-models` and are evaluated against
+the same manifests and metrics as the DSP analyzers. External projects remain
+baseline tools unless their provenance, license terms, artifact policy,
+preprocessing, and output mapping have been reviewed for integration. See
+[`../BACKENDS.md`](../BACKENDS.md) for the backend boundary and comparison
+fields.
+
 Every model comparison must record:
 
 - Repository and immutable source revision
@@ -74,6 +81,14 @@ Before selecting a final corpus, record its annotation license, audio
 acquisition terms, and known overlap with every compared model's training data.
 If training overlap is unknown, report the result as external validation, not
 as a clean held-out comparison.
+
+## Segment boundary metric
+
+`evaluate_segments.py` scores transitions between adjacent annotated and
+detected key segments. It uses one-to-one nearest matching within a stated
+tolerance and reports reference boundaries, detections, precision, recall, and
+F1. The metric is event-based and should not be replaced by the track-level
+`multi_key` flag when reporting key-change results.
 
 ## Reporting gate
 

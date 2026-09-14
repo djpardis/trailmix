@@ -10,6 +10,7 @@ members = [
     "crates/trailmix-codecs",
     "crates/trailmix-datasets",
     "crates/trailmix-manifest",
+    "crates/trailmix-models",
 ]
 exclude = [".bench_key"]
 resolver = "2"

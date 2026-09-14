@@ -79,12 +79,26 @@ optional `trailmix-codecs` crate opens audio files and runs the same analysis.
 The workspace also includes `trailmix-cli` for command-line use,
 `trailmix-bench` for machine-readable benchmarks, `trailmix-manifest` for the
 corpus annotation schema, `trailmix-datasets` for importing GiantSteps
-reference annotations, and `test-kitchen` as a loopback browser UI for
-playback, annotation, and on-demand analysis.
+reference annotations, `trailmix-models` for first-party learned backend
+contracts, and `test-kitchen` as a loopback browser UI for playback,
+annotation, and on-demand analysis.
+
+## Backend tracks
+
+The default backend is deterministic Rust DSP. It is the Cueport integration
+target and builds without model checkpoints or an inference runtime.
+
+First-party transformer and foundation-model work lives in `trailmix-models` so
+it can develop in parallel with the DSP path. External projects remain
+benchmark baselines under `benchmarks/baselines`, with source revisions,
+artifact hashes, license terms, training disclosures, preprocessing, and output
+conversion recorded before a result is used. See [`BACKENDS.md`](BACKENDS.md)
+for the accuracy, runtime, package-size, hardware, and licensing evidence
+required before a model backend changes the production claim.
 
 ## Design principles
 
-- **Rust**: all analysis is deterministic DSP.
+- **Rust DSP by default**: the production path is deterministic DSP.
 - **Small binary**: all three analyzers fit in < 3 MB.
 - **Portable**: runs on ARM, x86, and WASM.
 - **Interpretable**: intermediate features available for inspection (chroma
