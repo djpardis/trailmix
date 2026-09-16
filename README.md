@@ -69,7 +69,9 @@ buckets.
 - **key lime** estimates global and local major or minor keys using dual chroma
   extraction (Goertzel + Constant-Q Transform), averaged scores from multiple
   key profiles (Krumhansl-Kessler, Temperley, EDMA, and learned), median
-  aggregation, and confidence-gated segmentation.
+  aggregation, and confidence-gated segmentation. It also exposes
+  `extract_chroma_frames()` so learned key experiments can train on the same
+  normalized frame-level chroma sequence used by DSP analysis.
 - **sampler platter** generates compact waveform columns with raw min/max/RMS
   values plus optional display height and band-energy color hints.
 
@@ -79,9 +81,9 @@ optional `trailmix-codecs` crate opens audio files and runs the same analysis.
 The workspace also includes `trailmix-cli` for command-line use,
 `trailmix-bench` for machine-readable benchmarks, `trailmix-manifest` for the
 corpus annotation schema, `trailmix-datasets` for importing GiantSteps
-reference annotations, `trailmix-models` for first-party learned backend
-contracts, and `test-kitchen` as a loopback browser UI for playback,
-annotation, and on-demand analysis.
+reference annotations and FMAKv2 key metadata, `trailmix-models` for
+first-party learned backend contracts, and `test-kitchen` as a loopback browser
+UI for playback, annotation, and on-demand analysis.
 
 ## Backend tracks
 

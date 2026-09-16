@@ -145,10 +145,10 @@ impl Default for KeyConfig {
     }
 }
 
-#[derive(Debug, Clone)]
-struct FrameChroma {
-    center_seconds: f64,
-    values: [f32; 12],
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ChromaFrame {
+    pub center_seconds: f64,
+    pub values: [f32; 12],
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -160,8 +160,78 @@ struct LocalEstimate {
 
 /// Estimate global and local major or minor keys from mono PCM.
 #[must_use]
-#[allow(clippy::too_many_lines)]
 pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnalysis {
+    let Some((frame_chromas, frame_energies)) = frame_chroma_sequence(samples, sample_rate, config)
+    else {
+        return empty_analysis();
+    };
+
+    let mut chroma = [0.0_f32; 12];
+    let onset_weights = compute_onset_weights(&frame_energies);
+    let num_frames = frame_chromas.len();
+    let median_idx = num_frames / 2;
+    for (pitch_class, bin) in chroma.iter_mut().enumerate() {
+        let mut values: Vec<f32> = frame_chromas
+            .iter()
+            .zip(onset_weights.iter())
+            .map(|(frame, weight)| frame.values[pitch_class] * weight)
+            .collect();
+        let (_, median, _) = values.select_nth_unstable_by(median_idx, f32::total_cmp);
+        *bin = *median;
+    }
+
+    let total = chroma.iter().sum::<f32>();
+    if total <= f32::EPSILON {
+        return empty_analysis();
+    }
+
+    let tuning_offset = estimate_tuning(&frame_chromas);
+    if tuning_offset.abs() > 0.01 {
+        chroma = shift_chroma(&chroma, tuning_offset);
+    }
+    normalize_chroma(&mut chroma);
+
+    let (key, best_score, second_score) = classify_key(&chroma);
+    let confidence = key_confidence(best_score, second_score);
+    let duration_seconds = samples.len() as f64 / f64::from(sample_rate);
+    let segments = estimate_segments(&frame_chromas, duration_seconds, key, confidence, config);
+
+    let final_key = if segments.len() > 1 {
+        longest_segment_key(&segments).unwrap_or(key)
+    } else {
+        key
+    };
+
+    let alternate =
+        significant_alternate_key(&segments, final_key, config.alternate_coverage_threshold);
+
+    KeyAnalysis {
+        version: 6,
+        key: Some(final_key),
+        confidence,
+        chroma,
+        segments,
+        multi_key: alternate.is_some(),
+        alternate_key: alternate.map(|(key, _)| key),
+        alternate_coverage: alternate.map_or(0.0, |(_, coverage)| coverage),
+    }
+}
+
+/// Extract the normalized frame-level chroma sequence used by key analysis.
+#[must_use]
+pub fn extract_chroma_frames(
+    samples: &[f32],
+    sample_rate: u32,
+    config: KeyConfig,
+) -> Vec<ChromaFrame> {
+    frame_chroma_sequence(samples, sample_rate, config).map_or_else(Vec::new, |(frames, _)| frames)
+}
+
+fn frame_chroma_sequence(
+    samples: &[f32],
+    sample_rate: u32,
+    config: KeyConfig,
+) -> Option<(Vec<ChromaFrame>, Vec<f32>)> {
     if sample_rate == 0
         || config.frame_size < 32
         || config.hop_size == 0
@@ -170,7 +240,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
         || config.local_window_seconds <= 0.0
         || config.local_hop_seconds <= 0.0
     {
-        return empty_analysis();
+        return None;
     }
 
     let window = hanning_window(config.frame_size);
@@ -181,7 +251,6 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
         config.maximum_midi_note,
     );
     let mut windowed_frame = vec![0.0_f32; config.frame_size];
-    let mut chroma = [0.0_f32; 12];
     let mut frame_chromas = Vec::new();
     let mut frame_energies = Vec::new();
     let mut start = 0;
@@ -225,7 +294,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
                 gc
             };
 
-            frame_chromas.push(FrameChroma {
+            frame_chromas.push(ChromaFrame {
                 center_seconds: (start + config.frame_size / 2) as f64 / f64::from(sample_rate),
                 values: frame_chroma,
             });
@@ -235,56 +304,9 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
     }
 
     if frame_chromas.is_empty() {
-        return empty_analysis();
-    }
-
-    let onset_weights = compute_onset_weights(&frame_energies);
-    let num_frames = frame_chromas.len();
-    let median_idx = num_frames / 2;
-    for (pitch_class, bin) in chroma.iter_mut().enumerate() {
-        let mut values: Vec<f32> = frame_chromas
-            .iter()
-            .zip(onset_weights.iter())
-            .map(|(frame, weight)| frame.values[pitch_class] * weight)
-            .collect();
-        let (_, median, _) = values.select_nth_unstable_by(median_idx, f32::total_cmp);
-        *bin = *median;
-    }
-
-    let total = chroma.iter().sum::<f32>();
-    if frame_chromas.is_empty() || total <= f32::EPSILON {
-        return empty_analysis();
-    }
-
-    let tuning_offset = estimate_tuning(&frame_chromas);
-    if tuning_offset.abs() > 0.01 {
-        chroma = shift_chroma(&chroma, tuning_offset);
-    }
-    normalize_chroma(&mut chroma);
-
-    let (key, best_score, second_score) = classify_key(&chroma);
-    let confidence = key_confidence(best_score, second_score);
-    let duration_seconds = samples.len() as f64 / f64::from(sample_rate);
-    let segments = estimate_segments(&frame_chromas, duration_seconds, key, confidence, config);
-
-    let final_key = if segments.len() > 1 {
-        longest_segment_key(&segments).unwrap_or(key)
+        None
     } else {
-        key
-    };
-
-    let alternate =
-        significant_alternate_key(&segments, final_key, config.alternate_coverage_threshold);
-
-    KeyAnalysis {
-        version: 6,
-        key: Some(final_key),
-        confidence,
-        chroma,
-        segments,
-        multi_key: alternate.is_some(),
-        alternate_key: alternate.map(|(key, _)| key),
-        alternate_coverage: alternate.map_or(0.0, |(_, coverage)| coverage),
+        Some((frame_chromas, frame_energies))
     }
 }
 
@@ -371,7 +393,7 @@ fn compute_onset_weights(energies: &[f32]) -> Vec<f32> {
 /// Estimate global tuning offset in fractional pitch-class bins (-0.5 to +0.5).
 /// Finds the weighted-average deviation of energy peaks from integer bin centers
 /// across all frames. A result of +0.3 means the track is tuned ~30 cents sharp.
-fn estimate_tuning(frames: &[FrameChroma]) -> f32 {
+fn estimate_tuning(frames: &[ChromaFrame]) -> f32 {
     if frames.is_empty() {
         return 0.0;
     }
@@ -444,7 +466,7 @@ fn key_confidence(best_score: f32, second_score: f32) -> f32 {
 }
 
 fn estimate_segments(
-    frames: &[FrameChroma],
+    frames: &[ChromaFrame],
     duration_seconds: f64,
     global_key: MusicalKey,
     global_confidence: f32,
@@ -929,6 +951,27 @@ mod tests {
         assert_eq!(result.segments[0].key, result.key.expect("key"));
         assert!(!result.multi_key);
         assert_eq!(result.alternate_key, None);
+    }
+
+    #[test]
+    fn extracts_normalized_chroma_frames() {
+        let samples = chord(&[220.0, 277.18, 329.63], 4.0, 8_000);
+        let frames = extract_chroma_frames(
+            &samples,
+            8_000,
+            KeyConfig {
+                frame_size: 2_048,
+                hop_size: 1_024,
+                ..KeyConfig::default()
+            },
+        );
+
+        assert!(!frames.is_empty());
+        assert!(frames[0].center_seconds > 0.0);
+        for frame in frames {
+            let total = frame.values.iter().sum::<f32>();
+            assert!((total - 1.0).abs() < 1.0e-4, "{total}");
+        }
     }
 
     #[test]
