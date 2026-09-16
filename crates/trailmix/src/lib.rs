@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub use beat_salad::{BeatAnalysis, BeatConfig, BeatPosition, TempoSegment};
 pub use key_lime::{
     ChromaFrame, KeyAnalysis, KeyConfig, KeySegment, Mode, MusicalKey, PitchClass,
-    extract_chroma_frames,
+    classify_key_scores, extract_chroma_frames,
 };
 pub use sampler_platter::{WaveformColumn, WaveformOverview};
 

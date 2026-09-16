@@ -72,9 +72,11 @@ record those audio terms before using the imported manifest for training or
 paper claims.
 
 Use `trailmix-bench --manifest <manifest.json> --fast --parallel
---key-frame-features` to export the normalized frame-level chroma sequence for
-learned-key training. Leave `--key-frame-features` off for normal benchmark
-reports so default result JSON remains compact.
+--key-frame-features` to export the normalized frame-level chroma sequence and
+the 24 DSP key candidate scores for learned-key training. Both `key_chroma_frames`
+and `key_scores` appear per track so a reranker can consume the sequence input
+and the DSP prior from the same feature file. Leave `--key-frame-features` off
+for normal benchmark reports so default result JSON remains compact.
 
 Every model comparison must record:
 
