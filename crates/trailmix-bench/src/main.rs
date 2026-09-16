@@ -136,6 +136,12 @@ struct TrackResult {
     apple_music_understanding_exact_key_agreement: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     chroma: Option<[f32; 12]>,
+    /// DSP key candidate scores (24 = 12 major + 12 minor) computed from the
+    /// track's global chroma. Emitted only when frame features are requested,
+    /// so default benchmark output stays compact. Consumers such as the
+    /// learned reranker use the same tonic + 12 * mode layout as the trainers.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    key_scores: Option<[f32; 24]>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     key_chroma_frames: Vec<KeyChromaFrame>,
     error: Option<String>,
@@ -913,6 +919,7 @@ fn analyze_manifest_track(
             apple_music_understanding_scores.bpm_octave_aware,
         apple_music_understanding_exact_key_agreement: apple_music_understanding_scores.exact_key,
         chroma: Some(analysis.key.chroma),
+        key_scores: key_scores_for_training(key_frame_features, &analysis.key.chroma),
         key_chroma_frames: serialize_chroma_frames(
             key_frame_features,
             &decoded.samples,
@@ -1023,6 +1030,7 @@ fn analyze_manifest_track_fast(
             apple_music_understanding_scores.bpm_octave_aware,
         apple_music_understanding_exact_key_agreement: apple_music_understanding_scores.exact_key,
         chroma: Some(analysis.key.chroma),
+        key_scores: key_scores_for_training(key_frame_features, &analysis.key.chroma),
         key_chroma_frames: serialize_chroma_frames(
             key_frame_features,
             &decoded.samples,
@@ -1094,6 +1102,7 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         apple_music_understanding_bpm_octave_aware_absolute_agreement: None,
         apple_music_understanding_exact_key_agreement: None,
         chroma: None,
+        key_scores: None,
         key_chroma_frames: Vec::new(),
         error: Some(error),
     }
@@ -1145,6 +1154,18 @@ fn serialize_chroma_frames(
             chroma: frame.values,
         })
         .collect()
+}
+
+/// Emit DSP key candidate scores only when training features are requested,
+/// so default benchmark JSON stays compact. The scores share the tonic + 12 * mode
+/// layout used by the learned trainers, letting a reranker consume them
+/// directly as a DSP prior.
+fn key_scores_for_training(enabled: bool, chroma: &[f32; 12]) -> Option<[f32; 24]> {
+    if enabled {
+        Some(trailmix::classify_key_scores(chroma))
+    } else {
+        None
+    }
 }
 
 fn octave_aware_error(expected: f32, detected: f32) -> f32 {
@@ -2267,5 +2288,9 @@ mod tests {
         assert!(report.tracks[0].bpm_absolute_error.is_some());
         assert!(report.tracks[0].key_chroma_frames.is_empty());
         assert!(!feature_report.tracks[0].key_chroma_frames.is_empty());
+        // key_scores accompanies the frame features so the reranker has both
+        // the sequence input and the DSP prior in a single feature file.
+        assert!(report.tracks[0].key_scores.is_none());
+        assert!(feature_report.tracks[0].key_scores.is_some());
     }
 }

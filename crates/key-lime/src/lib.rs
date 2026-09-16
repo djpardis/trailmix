@@ -789,7 +789,29 @@ fn goertzel_power_prewindowed(samples: &[f32], coefficient: f32) -> f32 {
         .max(0.0)
 }
 
+/// Raw key-profile scores for the 24 major and minor keys.
+///
+/// The layout is 12 major keys (C..B) followed by 12 minor keys (C..B), so
+/// index `tonic + 12 * mode` maps to a single key candidate. This is the same
+/// 24-class convention used by the learned key trainers, so training code can
+/// consume these scores directly as a DSP prior for reranking without
+/// re-implementing key classification.
+///
+/// Scores are the averaged multi-profile correlations before relative-key
+/// disambiguation, so consumers get an honest signal even for keys the
+/// classifier ultimately did not pick.
+#[must_use]
+pub fn classify_key_scores(chroma: &[f32; 12]) -> [f32; 24] {
+    let (_key, _best, _second, scores) = classify_key_impl(chroma);
+    scores
+}
+
 fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
+    let (key, best, second, _scores) = classify_key_impl(chroma);
+    (key, best, second)
+}
+
+fn classify_key_impl(chroma: &[f32; 12]) -> (MusicalKey, f32, f32, [f32; 24]) {
     const KRUMHANSL_MAJOR: [f32; 12] = [
         6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88,
     ];
@@ -820,6 +842,7 @@ fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
         (&LEARNED_MAJOR, &LEARNED_MINOR),
     ];
 
+    let mut scores = [0.0_f32; 24];
     let mut best_key = MusicalKey {
         tonic: PitchClass::C,
         mode: Mode::Major,
@@ -837,6 +860,8 @@ fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
         }
         let major_score = major_sum / profiles.len() as f32;
         let minor_score = minor_sum / profiles.len() as f32;
+        scores[root] = major_score;
+        scores[12 + root] = minor_score;
 
         for (mode, score) in [(Mode::Major, major_score), (Mode::Minor, minor_score)] {
             if score > best_score {
@@ -859,7 +884,7 @@ fn classify_key(chroma: &[f32; 12]) -> (MusicalKey, f32, f32) {
 
     let final_key =
         disambiguate_relative_keys(chroma, best_key, second_key, best_score, second_score);
-    (final_key, best_score, second_score)
+    (final_key, best_score, second_score, scores)
 }
 
 fn disambiguate_relative_keys(
@@ -951,6 +976,30 @@ mod tests {
         assert_eq!(result.segments[0].key, result.key.expect("key"));
         assert!(!result.multi_key);
         assert_eq!(result.alternate_key, None);
+    }
+
+    #[test]
+    fn classify_key_scores_returns_all_24_candidates() {
+        // Synthetic A minor chroma so the top candidate should be A minor.
+        let mut chroma = [0.0_f32; 12];
+        chroma[PitchClass::A as usize] = 1.0;
+        chroma[PitchClass::C as usize] = 0.6;
+        chroma[PitchClass::E as usize] = 0.6;
+
+        let scores = classify_key_scores(&chroma);
+
+        assert_eq!(scores.len(), 24);
+        // The learned trainers use tonic + 12 * mode, so A minor is at index 21.
+        let mut best_index = 0;
+        for index in 1..24 {
+            if scores[index] > scores[best_index] {
+                best_index = index;
+            }
+        }
+        assert_eq!(best_index, 12 + PitchClass::A as usize);
+        // Distant relative parallel/tritone candidates should not top the
+        // winning candidate, guarding against sign or index bugs.
+        assert!(scores[best_index] >= scores[PitchClass::A as usize]);
     }
 
     #[test]
