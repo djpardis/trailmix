@@ -52,3 +52,8 @@ Accuracy improvements should be reported together with their runtime,
 packaging, hardware, and licensing costs. The default DSP path remains the
 reference implementation for applications while the first-party model track
 develops in parallel.
+
+Do not hide accuracy losses behind local application constraints. If a backend
+is chosen because it is smaller, faster, or easier to ship, report the measured
+accuracy loss together with the measured efficiency gain and the reason that
+tradeoff fits the application.

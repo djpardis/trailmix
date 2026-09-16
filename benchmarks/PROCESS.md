@@ -65,6 +65,17 @@ preprocessing, and output mapping have been reviewed for integration. See
 [`../BACKENDS.md`](../BACKENDS.md) for the backend boundary and comparison
 fields.
 
+Use `trailmix-datasets fmakv2 <metadata-root-or-csv> <audio-root>
+<manifest.json>` to import FMAKv2 key metadata as training candidates. The
+annotations are CC BY 4.0, while FMA audio uses per-track licenses. Audit and
+record those audio terms before using the imported manifest for training or
+paper claims.
+
+Use `trailmix-bench --manifest <manifest.json> --fast --parallel
+--key-frame-features` to export the normalized frame-level chroma sequence for
+learned-key training. Leave `--key-frame-features` off for normal benchmark
+reports so default result JSON remains compact.
+
 Every model comparison must record:
 
 - Repository and immutable source revision

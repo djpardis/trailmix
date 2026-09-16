@@ -76,8 +76,10 @@ three and returns one combined result. `trailmix-codecs` handles file decoding.
 - `trailmix-codecs` provides separately selectable common-format decoders and
   audio-file analysis helpers.
 - `trailmix-manifest` defines and validates local evaluation-corpus annotations.
-- `trailmix-datasets` imports GiantSteps Tempo v2 and GiantSteps Key reference
-  annotations into the shared manifest while retaining dataset provenance.
+- `trailmix-datasets` imports GiantSteps Tempo v2, GiantSteps Key, and FMAKv2
+  key metadata into the shared manifest while retaining dataset provenance.
+  FMAKv2 imports are training candidates until per-track FMA audio-license terms
+  are audited.
 - `trailmix-models` defines first-party learned backend contracts and artifact
   metadata requirements. It does not include model weights, conversion scripts,
   or a third-party inference runtime.
@@ -105,6 +107,11 @@ double-counting). Goertzel with harmonic summation captures harmonic series
 relationships effectively. Combining both, after independent whitening and
 normalization, produces features with lower correlated errors than either method
 alone.
+
+`key-lime` exposes `extract_chroma_frames()` for learned-key experiments. The
+function returns the same normalized frame-level chroma sequence that DSP
+analysis uses internally, so training data can share the production feature
+path without adding a model runtime to the default backend.
 
 ## Output versions
 

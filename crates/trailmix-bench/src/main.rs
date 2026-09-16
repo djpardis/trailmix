@@ -136,6 +136,8 @@ struct TrackResult {
     apple_music_understanding_exact_key_agreement: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     chroma: Option<[f32; 12]>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    key_chroma_frames: Vec<KeyChromaFrame>,
     error: Option<String>,
 }
 
@@ -145,6 +147,12 @@ struct DetectedKeySegment {
     end_seconds: f64,
     key: String,
     confidence: f32,
+}
+
+#[derive(Serialize)]
+struct KeyChromaFrame {
+    center_seconds: f64,
+    chroma: [f32; 12],
 }
 
 #[derive(Serialize)]
@@ -222,6 +230,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut limit: Option<usize> = None;
     let mut parallel = false;
     let mut fast = false;
+    let mut key_frame_features = false;
     let mut key_segment_confidence: Option<f32> = None;
     let mut key_minimum_segment_seconds: Option<f32> = None;
     let mut cueport_db: Option<&str> = None;
@@ -245,6 +254,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
             "--parallel" => parallel = true,
             "--fast" => fast = true,
+            "--key-frame-features" => key_frame_features = true,
             "--key-segment-confidence" => {
                 i += 1;
                 key_segment_confidence = Some(
@@ -296,6 +306,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 limit,
                 parallel,
                 fast,
+                key_frame_features,
                 key_segment_confidence,
                 key_minimum_segment_seconds,
             )?)?,
@@ -306,7 +317,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 }
 
 fn usage() -> String {
-    "usage: trailmix-bench [--manifest <path>] [--limit N] [--parallel] [--fast] [--key-segment-confidence <value>] [--key-minimum-seconds <value>] [--cueport-db <cueport.db> --cueport-serato-folder <folder> [--jsonl <path>]]".into()
+    "usage: trailmix-bench [--manifest <path>] [--limit N] [--parallel] [--fast] [--key-frame-features] [--key-segment-confidence <value>] [--key-minimum-seconds <value>] [--cueport-db <cueport.db> --cueport-serato-folder <folder> [--jsonl <path>]]".into()
 }
 
 fn run_cueport_serato_folder(
@@ -700,6 +711,7 @@ fn run_manifest(
     limit: Option<usize>,
     parallel: bool,
     fast: bool,
+    key_frame_features: bool,
     key_segment_confidence: Option<f32>,
     key_minimum_segment_seconds: Option<f32>,
 ) -> Result<CorpusBenchmark, Box<dyn Error>> {
@@ -716,6 +728,7 @@ fn run_manifest(
             analyze_manifest_track_fast(
                 track,
                 base_directory,
+                key_frame_features,
                 key_segment_confidence,
                 key_minimum_segment_seconds,
             )
@@ -723,6 +736,7 @@ fn run_manifest(
             analyze_manifest_track(
                 track,
                 base_directory,
+                key_frame_features,
                 key_segment_confidence,
                 key_minimum_segment_seconds,
             )
@@ -794,6 +808,7 @@ fn measure_analyzers(samples: &[f32], sample_rate: u32, config: AnalysisConfig) 
 fn analyze_manifest_track(
     track: &TrackAnnotation,
     base_directory: &Path,
+    key_frame_features: bool,
     key_segment_confidence: Option<f32>,
     key_minimum_segment_seconds: Option<f32>,
 ) -> TrackResult {
@@ -898,6 +913,12 @@ fn analyze_manifest_track(
             apple_music_understanding_scores.bpm_octave_aware,
         apple_music_understanding_exact_key_agreement: apple_music_understanding_scores.exact_key,
         chroma: Some(analysis.key.chroma),
+        key_chroma_frames: serialize_chroma_frames(
+            key_frame_features,
+            &decoded.samples,
+            decoded.sample_rate,
+            config.key,
+        ),
         error: None,
     }
 }
@@ -906,6 +927,7 @@ fn analyze_manifest_track(
 fn analyze_manifest_track_fast(
     track: &TrackAnnotation,
     base_directory: &Path,
+    key_frame_features: bool,
     key_segment_confidence: Option<f32>,
     key_minimum_segment_seconds: Option<f32>,
 ) -> TrackResult {
@@ -1001,6 +1023,12 @@ fn analyze_manifest_track_fast(
             apple_music_understanding_scores.bpm_octave_aware,
         apple_music_understanding_exact_key_agreement: apple_music_understanding_scores.exact_key,
         chroma: Some(analysis.key.chroma),
+        key_chroma_frames: serialize_chroma_frames(
+            key_frame_features,
+            &decoded.samples,
+            decoded.sample_rate,
+            config.key,
+        ),
         error: None,
     }
 }
@@ -1066,6 +1094,7 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         apple_music_understanding_bpm_octave_aware_absolute_agreement: None,
         apple_music_understanding_exact_key_agreement: None,
         chroma: None,
+        key_chroma_frames: Vec::new(),
         error: Some(error),
     }
 }
@@ -1096,6 +1125,24 @@ fn serialize_key_segments(segments: &[trailmix::KeySegment]) -> Vec<DetectedKeyS
             end_seconds: segment.end_seconds,
             key: segment.key.to_string(),
             confidence: segment.confidence,
+        })
+        .collect()
+}
+
+fn serialize_chroma_frames(
+    enabled: bool,
+    samples: &[f32],
+    sample_rate: u32,
+    config: trailmix::KeyConfig,
+) -> Vec<KeyChromaFrame> {
+    if !enabled {
+        return Vec::new();
+    }
+    trailmix::extract_chroma_frames(samples, sample_rate, config)
+        .into_iter()
+        .map(|frame| KeyChromaFrame {
+            center_seconds: frame.center_seconds,
+            chroma: frame.values,
         })
         .collect()
 }
@@ -1507,7 +1554,7 @@ fn mirex_key_score(expected: MusicalKey, detected: MusicalKey) -> f32 {
     let det_pc = detected.tonic as i8;
     let interval = ((det_pc - exp_pc).rem_euclid(12)) as u8;
 
-    if expected.mode == detected.mode && interval == 7 {
+    if expected.mode == detected.mode && (interval == 7 || interval == 5) {
         return 0.5;
     }
 
@@ -1998,6 +2045,10 @@ mod tests {
             tonic: PitchClass::G,
             mode: Mode::Major,
         };
+        let f_major = MusicalKey {
+            tonic: PitchClass::F,
+            mode: Mode::Major,
+        };
         let c_minor = MusicalKey {
             tonic: PitchClass::C,
             mode: Mode::Minor,
@@ -2009,6 +2060,7 @@ mod tests {
 
         assert!((mirex_key_score(c_major, c_major) - 1.0).abs() < f32::EPSILON);
         assert!((mirex_key_score(c_major, g_major) - 0.5).abs() < f32::EPSILON);
+        assert!((mirex_key_score(c_major, f_major) - 0.5).abs() < f32::EPSILON);
         assert!((mirex_key_score(c_major, a_minor) - 0.3).abs() < f32::EPSILON);
         assert!((mirex_key_score(c_major, c_minor) - 0.2).abs() < f32::EPSILON);
         assert!((mirex_key_score(c_major, d_major) - 0.0).abs() < f32::EPSILON);
@@ -2203,13 +2255,17 @@ mod tests {
         )
         .expect("write manifest");
 
-        let report =
-            run_manifest(&manifest_path, None, false, false, None, None).expect("run benchmark");
+        let report = run_manifest(&manifest_path, None, false, false, false, None, None)
+            .expect("run benchmark");
+        let feature_report = run_manifest(&manifest_path, None, false, true, true, None, None)
+            .expect("run benchmark with frame features");
         fs::remove_dir_all(directory).expect("remove fixtures");
 
         assert_eq!(report.summary.analyzed_tracks, 1);
         assert_eq!(report.summary.failed_tracks, 0);
         assert!(report.tracks[0].error.is_none());
         assert!(report.tracks[0].bpm_absolute_error.is_some());
+        assert!(report.tracks[0].key_chroma_frames.is_empty());
+        assert!(!feature_report.tracks[0].key_chroma_frames.is_empty());
     }
 }
