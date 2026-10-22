@@ -42,25 +42,6 @@ When the application already has mono PCM, call the core API directly.
 let analysis = trailmix::analyze(audio, trailmix::AnalysisConfig::default());
 ```
 
-## Benchmarking against a Cueport Serato folder
-
-`trailmix-bench` can compare trail mix output against the Serato BPM and key
-values that Cueport imported for a specific folder. The command prints progress
-for each file, records the trail mix git SHA, hashes the exact audio file, and
-writes optional JSON Lines output as each track finishes.
-
-```sh
-cargo run -p trailmix-bench --release --features cueport-db -- \
-  --cueport-db "$HOME/Library/Application Support/com.cueport.app/cueport.db" \
-  --cueport-serato-folder "$HOME/Music/Music/Download library/mp3s/qobuz/qobuz-2026-01" \
-  --jsonl /tmp/trailmix-qobuz.jsonl
-```
-
-The summary separates decoder failures, tracks with no detected BPM, ordinary
-BPM error, octave-aware BPM error, MIREX Accuracy 1 and Accuracy 2, tempo
-ratio buckets, exact key agreement, MIREX key score, and key-relationship
-buckets.
-
 ## Structure
 
 - **beat salad** estimates global BPM, beat positions with downbeat inference,
@@ -91,7 +72,7 @@ The default backend is deterministic Rust DSP. It is the Cueport integration
 target and builds without model checkpoints or an inference runtime.
 
 First-party transformer and foundation-model work lives in `trailmix-models` so
-it can develop in parallel with the DSP path. External projects remain
+it can develop in parallel with the DSP backend. External projects remain
 benchmark baselines under `benchmarks/baselines`, with source revisions,
 artifact hashes, license terms, training disclosures, preprocessing, and output
 conversion recorded before a result is used. See [`BACKENDS.md`](BACKENDS.md)
