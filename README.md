@@ -7,97 +7,166 @@
 [![CI](https://github.com/djpardis/trailmix/actions/workflows/ci.yml/badge.svg)](https://github.com/djpardis/trailmix/actions/workflows/ci.yml)
 ![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)
 
-**trail mix** is an audio-analysis toolkit written in Rust. It produces tempo,
-musical key, beat positions, and compact waveform data as JSON.
+**trail mix** is an audio-analysis library. It turns audio into versioned
+JSON for tempo, beats, key, key segments, and waveform display data.
 
-[Cueport](https://usecueport.com/) uses **trail mix** for local waveform
-and audio-analysis features, but the crates are built for any desktop, mobile,
-server, or research tool that needs local tempo, key, and waveform analysis.
+It is built for local analysis in music applications, library import jobs,
+playback prep, annotation tools, and MIR research workflows.
+[Cueport](https://usecueport.com/) uses trail mix for local waveform and
+audio-analysis features.
 
-## Quick start
+## Outputs
 
-**trail mix** requires Rust 1.85 or newer. Run the CLI from the repository root.
+A trail mix analysis can include:
+
+- **beat salad**: tempo and beat data.
+  `global_bpm` is the precise track-level tempo estimate. `display_bpm` is the
+  UI-friendly rounded BPM chosen to fit the beat timing. `tempo_segments` are
+  sections where BPM changes over time. `beats` are timed beat positions with a
+  confidence value and 4/4 `position_in_bar`.
+- **key lime**: global key, local key segments, the key estimator used, and the
+  DSP key used as the transformer reranker prior. `key` is the selected global
+  key. `segments` are local key regions. `estimator` records whether the result
+  came from DSP or the reranker. `dsp_key` keeps the DSP prior. `chroma` stores
+  the global pitch-class profile.
+- **sampler platter**: compact waveform columns for drawing an overview without
+  storing full PCM. `columns` are display buckets. Each column stores `min`,
+  `max`, and `rms` values.
+- **benchmark features**: optional training and evaluation features.
+  `key_chroma_frames` are frame-level chroma vectors. `key_scores` are DSP key
+  candidate scores. Confidence values are carried on beat, tempo-segment, key,
+  and key-segment outputs.
+
+The output schema is versioned so applications can store results and compare
+them across releases.
+
+## Analyzers
+
+<article class="analyzer-card">
+  <img class="analyzer-logo" src="docs/beat-salad-card.png" alt="beat salad illustration">
+  <h3 class="part-name">beat salad</h3>
+  <p>Finds the tempo of a track and where its beats fall, including places where the tempo changes.</p>
+  <dl class="analyzer-facts">
+    <div>
+      <dt>crate</dt>
+      <dd><span class="part-name">beat-salad</span></dd>
+    </div>
+  </dl>
+  <a class="crate-link" href="https://github.com/djpardis/trailmix/tree/main/crates/beat-salad">
+    <svg class="crate-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+    <span>View crate</span>
+  </a>
+</article>
+
+<article class="analyzer-card">
+  <img class="analyzer-logo" src="docs/key-lime-card.png" alt="key lime illustration">
+  <h3 class="part-name">key lime</h3>
+  <p>Estimates the musical key of a track and of sections where the key changes. A compact transformer reranker chooses the global key.</p>
+  <dl class="analyzer-facts">
+    <div>
+      <dt>crate</dt>
+      <dd><span class="part-name">key-lime</span></dd>
+    </div>
+  </dl>
+  <a class="crate-link" href="https://github.com/djpardis/trailmix/tree/main/crates/key-lime">
+    <svg class="crate-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+    <span>View crate</span>
+  </a>
+</article>
+
+<article class="analyzer-card">
+  <img class="analyzer-logo" src="docs/sampler-platter-card.png" alt="sampler platter illustration">
+  <h3 class="part-name">sampler platter</h3>
+  <p>Summarizes a track into waveform columns for drawing an overview without storing the full audio.</p>
+  <dl class="analyzer-facts">
+    <div>
+      <dt>crate</dt>
+      <dd><span class="part-name">sampler-platter</span></dd>
+    </div>
+  </dl>
+  <a class="crate-link" href="https://github.com/djpardis/trailmix/tree/main/crates/sampler-platter">
+    <svg class="crate-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+    <span>View crate</span>
+  </a>
+</article>
+
+## How it works
+
+trail mix has one input shape: mono PCM plus analysis configuration.
+`trailmix-codecs` can create that buffer from an audio file when an application
+wants trail mix to handle decoding.
+
+Use `trailmix::analyze()` when you want one `analysis-v1` result with tempo,
+key, and waveform data. Call beat salad, key lime, or sampler platter directly
+when your application only needs one output.
+
+The [Architecture](ARCHITECTURE.md) page explains the internal flow and
+algorithms. The [Transformer](TRANSFORMER.md) page explains the key lime
+reranker and validation.
+
+## How to use it
+
+Run `trailmix-cli` from the repository root:
 
 ```sh
 cargo run -p trailmix-cli -- song.mp3
 ```
 
-The CLI supports MP3, FLAC, AIFF, WAV, AAC-in-MP4, and ALAC-in-MP4 and prints
-versioned analysis results as JSON. CI tests Linux, macOS, and Windows.
+Run `trailmix-cli` with key lime's DSP-only estimator by disabling default
+features:
 
-`trailmix_codecs::analyze_path()` accepts an audio file and handles decoding,
-mono PCM prep, and analysis.
+```sh
+cargo run -p trailmix-cli --no-default-features -- song.mp3
+```
+
+Use `trailmix-codecs` through `trailmix_codecs::analyze_path()` when trail mix
+should open and decode the file:
 
 ```rust
 let analysis = trailmix_codecs::analyze_path(
     "song.mp3",
     trailmix::AnalysisConfig::default(),
 )?;
-let json = serde_json::to_string(&analysis)?;
 ```
 
-When the application already has mono PCM, call the core API directly.
+Use the `trailmix` facade through `trailmix::analyze()` when your application
+already has mono PCM:
 
 ```rust
 let analysis = trailmix::analyze(audio, trailmix::AnalysisConfig::default());
 ```
 
-## Structure
+## Backend choices
 
-- **beat salad** estimates global BPM, beat positions with downbeat inference,
-  and local tempo segments. Uses autocorrelation with harmonic scoring and a
-  gentle octave prior.
-- **key lime** estimates global and local major or minor keys using dual chroma
-  extraction (Goertzel + Constant-Q Transform), averaged scores from multiple
-  key profiles (Krumhansl-Kessler, Temperley, EDMA, and learned), median
-  aggregation, and confidence-gated segmentation. It also exposes
-  `extract_chroma_frames()` so learned key experiments can train on the same
-  normalized frame-level chroma sequence used by DSP analysis.
-- **sampler platter** generates compact waveform columns with raw min/max/RMS
-  values plus optional display height and band-energy color hints.
+The key lime production default is DSP plus the compact key reranker. The reranker
+is embedded in the crate and does not require ONNX Runtime. A DSP-only build is
+available with `--no-default-features`.
 
-The `trailmix` crate combines the three analyzers behind one results API. The
-optional `trailmix-codecs` crate opens audio files and runs the same analysis.
+Future learned or platform-native analyzers should keep the same `analysis-v1`
+contract or introduce a new schema version. [BACKENDS.md](BACKENDS.md) lists the
+evidence required before a backend changes the production claim.
 
-The workspace also includes `trailmix-cli` for command-line use,
-`trailmix-bench` for machine-readable benchmarks, `trailmix-manifest` for the
-corpus annotation schema, `trailmix-datasets` for importing GiantSteps
-reference annotations and FMAKv2 key metadata, `trailmix-models` for
-first-party learned backend contracts, and `test-kitchen` as a loopback browser
-UI for playback, annotation, and on-demand analysis.
+## Evaluation
 
-## Backend tracks
+The beat salad tempo and beat-grid outputs and sampler platter waveform outputs
+are the most mature parts of the implementation. The key lime reranker improves
+global key accuracy while keeping the same local result contract. The
+[Transformer](TRANSFORMER.md) page summarizes the model and validation.
 
-The default backend is deterministic Rust DSP. It is the Cueport integration
-target and builds without model checkpoints or an inference runtime.
+## FOSSY 2026 talk
 
-First-party transformer and foundation-model work lives in `trailmix-models` so
-it can develop in parallel with the DSP backend. External projects remain
-benchmark baselines under `benchmarks/baselines`, with source revisions,
-artifact hashes, license terms, training disclosures, preprocessing, and output
-conversion recorded before a result is used. See [`BACKENDS.md`](BACKENDS.md)
-for the accuracy, runtime, package-size, hardware, and licensing evidence
-required before a model backend changes the production claim.
+The FOSSY 2026 talk,
+[trail mix: Open tempo, key, and waveform analysis](https://djpardis.com/talks/trail-mix-fossy-2026/),
+explains the original DSP analyzer design. It describes the DSP-only key lime
+version of trail mix.
 
-## Design principles
+## Contributing
 
-- **Rust DSP by default**: the production path is deterministic DSP.
-- **Small binary**: all three analyzers fit in < 3 MB.
-- **Portable**: runs on ARM, x86, and WASM.
-- **Interpretable**: intermediate features available for inspection (chroma
-  vectors, onset envelopes, confidence scores).
-
-## Accuracy and next step
-
-BPM, beat-grid, and waveform outputs are the most mature parts of the current
-implementation. Key estimation has the largest accuracy gap and is the main
-target for improvement.
-
-The next step is optional model-based or platform-native analysis. The DSP core
-remains the default for apps that need local, dependency-light analysis.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local checks, data rules, and commit
+style, and [RELEASE.md](RELEASE.md) for the release process.
 
 ## License
 
 **trail mix** is available under your choice of the [MIT License](LICENSE-MIT) or
-the [Apache License, Version 2.0](LICENSE-APACHE). Codec-related
-notices are recorded in [THIRD_PARTY.md](THIRD_PARTY.md).
+the [Apache License, Version 2.0](LICENSE-APACHE). Codec-related notices are
+recorded in [THIRD_PARTY.md](THIRD_PARTY.md).

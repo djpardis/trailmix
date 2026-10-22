@@ -5,21 +5,43 @@ const markdownIt = require("markdown-it");
 const repositoryUrl = "https://github.com/djpardis/trailmix";
 const readmePath = path.join(__dirname, "README.md");
 const architecturePath = path.join(__dirname, "ARCHITECTURE.md");
+const transformerPath = path.join(__dirname, "TRANSFORMER.md");
 
-function decorateProjectName(html) {
-  const protectedNames = [];
-  const protectedHtml = html.replace(
-    /<strong(?: class="project-name")?>trail mix<\/strong>/g,
-    () => {
-      const placeholder = `__PROJECT_NAME_${protectedNames.length}__`;
-      protectedNames.push('<strong class="project-name">trail mix</strong>');
-      return placeholder;
-    },
-  );
+function decorateProjectNames(html) {
+  const decorated = html
+    .split(/(<[^>]+>)/g)
+    .map((part) => {
+      if (part.startsWith("<")) {
+        return part;
+      }
 
-  return protectedHtml
-    .replace(/\btrail mix\b/g, '<strong class="project-name">trail mix</strong>')
-    .replace(/__PROJECT_NAME_(\d+)__/g, (_, index) => protectedNames[index]);
+      return part
+        .replace(/\bbeat salad's\b/g, '<strong class="part-name">beat salad\'s</strong>')
+        .replace(/\bkey lime's\b/g, '<strong class="part-name">key lime\'s</strong>')
+        .replace(/\bsampler platter's\b/g, '<strong class="part-name">sampler platter\'s</strong>')
+        .replace(/\btrail mix\b/g, '<strong class="project-name">trail mix</strong>')
+        .replace(/\bbeat salad\b/g, '<strong class="part-name">beat salad</strong>')
+        .replace(/\bbeat-salad\b/g, '<strong class="part-name">beat-salad</strong>')
+        .replace(/\bkey lime\b/g, '<strong class="part-name">key lime</strong>')
+        .replace(/\bkey-lime\b/g, '<strong class="part-name">key-lime</strong>')
+        .replace(/\bsampler platter\b/g, '<strong class="part-name">sampler platter</strong>')
+        .replace(/\bsampler-platter\b/g, '<strong class="part-name">sampler-platter</strong>');
+    })
+    .join("");
+
+  return decorated
+    .replace(
+      /<strong><strong class="(project-name|part-name)">([^<]+)<\/strong><\/strong>/g,
+      '<strong class="$1">$2</strong>',
+    )
+    .replace(
+      /<(h3|span) class="part-name"><strong class="part-name">([^<]+)<\/strong><\/\1>/g,
+      '<$1 class="part-name">$2</$1>',
+    )
+    .replace(
+      /<strong class="part-name"><strong class="part-name">([^<]+)<\/strong>'s<\/strong>/g,
+      '<strong class="part-name">$1\'s</strong>',
+    );
 }
 
 function rewriteRepositoryLinks(html) {
@@ -29,14 +51,17 @@ function rewriteRepositoryLinks(html) {
       (_, target) =>
         target === "ARCHITECTURE.md"
           ? 'href="/architecture/"'
-          : `href="${repositoryUrl}/blob/main/${target}"`,
+          : target === "TRANSFORMER.md"
+            ? 'href="/transformer/"'
+            : `href="${repositoryUrl}/blob/main/${target}"`,
     )
+    .replace(/src="docs\/([^"/]+)"/g, (_, name) => `src="/assets/${name}?v=2"`)
     .replace(
-      /src="(?!https?:|data:)([^"]+)"/g,
+      /src="(?!https?:|data:|\/)([^"]+)"/g,
       'src="https://raw.githubusercontent.com/djpardis/trailmix/main/$1"',
     );
 
-  return decorateProjectName(rewritten);
+  return decorateProjectNames(rewritten);
 }
 
 function removeBadgeParagraphs(tokens) {
@@ -107,6 +132,27 @@ module.exports = function (eleventyConfig) {
   eleventyConfig.addPassthroughCopy({
     "docs/sampler-platter-card.png": "assets/sampler-platter-card.png",
   });
+  eleventyConfig.addPassthroughCopy({
+    "docs/key-lime-accuracy-footprint.svg": "assets/key-lime-accuracy-footprint.svg",
+  });
+  eleventyConfig.addPassthroughCopy({
+    "docs/key-lime-reranker-flow.svg": "assets/key-lime-reranker-flow.svg",
+  });
+  eleventyConfig.addPassthroughCopy({
+    "docs/crate-architecture.svg": "assets/crate-architecture.svg",
+  });
+  eleventyConfig.addPassthroughCopy({
+    "docs/beat-salad-pipeline.svg": "assets/beat-salad-pipeline.svg",
+  });
+  eleventyConfig.addPassthroughCopy({
+    "docs/key-lime-pipeline.svg": "assets/key-lime-pipeline.svg",
+  });
+  eleventyConfig.addPassthroughCopy({
+    "docs/chroma-folding.svg": "assets/chroma-folding.svg",
+  });
+  eleventyConfig.addPassthroughCopy({
+    "docs/waveform-columns.svg": "assets/waveform-columns.svg",
+  });
   eleventyConfig.addPassthroughCopy("docs/favicon-32x32.png");
   eleventyConfig.addPassthroughCopy("docs/apple-touch-icon.png");
   eleventyConfig.addPassthroughCopy("docs/icon-192.png");
@@ -118,6 +164,7 @@ module.exports = function (eleventyConfig) {
   eleventyConfig.addPassthroughCopy("docs/.nojekyll");
   eleventyConfig.addWatchTarget("README.md");
   eleventyConfig.addWatchTarget("ARCHITECTURE.md");
+  eleventyConfig.addWatchTarget("TRANSFORMER.md");
 
   eleventyConfig.addGlobalData("assetVersion", () => Date.now());
   eleventyConfig.addGlobalData("year", () => new Date().getFullYear());
@@ -232,7 +279,7 @@ module.exports = function (eleventyConfig) {
 
     return {
       title,
-      description: "trail mix architecture, crate boundaries, result stability, and current limitations.",
+      description: "trail mix architecture: analyzer algorithms, execution flow, the result contract, and references.",
       introHtml:
         firstHeadingClose >= 0 && firstSection > firstHeadingClose
           ? rewriteRepositoryLinks(
@@ -242,7 +289,65 @@ module.exports = function (eleventyConfig) {
                 {},
               ),
             )
-          : "<p>trail mix architecture, crate boundaries, result stability, and current limitations.</p>",
+          : "<p>trail mix architecture: analyzer algorithms, execution flow, the result contract, and references.</p>",
+      sections,
+    };
+  });
+
+  eleventyConfig.addGlobalData("transformer", () => {
+    const source = fs.readFileSync(transformerPath, "utf8");
+    const tokens = markdown.parse(source, {});
+    const title = source.match(/^#\s+(.+)$/m)?.[1] ?? "Key lime transformer";
+    const firstHeadingClose = tokens.findIndex(
+      (token) => token.type === "heading_close" && token.tag === "h1",
+    );
+    const firstSection = tokens.findIndex(
+      (token) => token.type === "heading_open" && token.tag === "h2",
+    );
+    const sections = [];
+
+    for (let index = firstSection; index < tokens.length; index += 1) {
+      if (tokens[index].type !== "heading_open" || tokens[index].tag !== "h2") {
+        continue;
+      }
+
+      const sectionTitle = tokens[index + 1].content;
+      let nextSection = index + 3;
+      while (
+        nextSection < tokens.length &&
+        (tokens[nextSection].type !== "heading_open" ||
+          tokens[nextSection].tag !== "h2")
+      ) {
+        nextSection += 1;
+      }
+
+      sections.push({
+        title: sectionTitle,
+        slug: sectionTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        html: rewriteRepositoryLinks(
+          markdown.renderer.render(
+            tokens.slice(index + 3, nextSection),
+            markdown.options,
+            {},
+          ),
+        ),
+      });
+      index = nextSection - 1;
+    }
+
+    return {
+      title,
+      description: "Compact transformer reranker for trail mix key estimation.",
+      introHtml:
+        firstHeadingClose >= 0 && firstSection > firstHeadingClose
+          ? rewriteRepositoryLinks(
+              markdown.renderer.render(
+                tokens.slice(firstHeadingClose + 1, firstSection),
+                markdown.options,
+                {},
+              ),
+            )
+          : "<p>Compact transformer reranker for trail mix key estimation.</p>",
       sections,
     };
   });

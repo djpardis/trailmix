@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360" role="img" aria-label="key lime pipeline with dual chroma extraction">
+
+  <defs>
+    <marker id="a" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6" fill="none" stroke="#5a403a" stroke-width="1.2"/>
+    </marker>
+  </defs>
+
+  <text x="36" y="36" font-family="DM Sans, Arial, sans-serif" font-size="16" font-weight="500" fill="#5a403a">key lime global key path</text>
+
+  <!-- Step 1: Hann frames -->
+  <rect x="24" y="64" width="160" height="64" fill="none" stroke="#5a403a" stroke-width="3.5" rx="0"/>
+  <text x="104" y="100" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="16" font-weight="500" fill="#5a403a">Hann frames</text>
+
+  <!-- Arrow splits into two paths -->
+  <path d="M184 96 L218 96" stroke="#5a403a" stroke-width="2.2" marker-end="url(#a)"/>
+
+  <!-- Step 2a: Goertzel path (top) -->
+  <rect x="218" y="52" width="170" height="40" fill="none" stroke="#765f7b" stroke-width="3.5" rx="0"/>
+  <text x="303" y="77" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="14" font-weight="500" fill="#765f7b">Goertzel + harmonics</text>
+
+  <!-- Step 2b: CQT path (bottom) -->
+  <rect x="218" y="102" width="170" height="40" fill="none" stroke="#765f7b" stroke-width="3.5" rx="0"/>
+  <text x="303" y="127" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="14" font-weight="500" fill="#765f7b">CQT (log-freq)</text>
+
+  <!-- Arrows from both paths merge -->
+  <path d="M388 72 L424 96" stroke="#5a403a" stroke-width="2.2"/>
+  <path d="M388 122 L424 96" stroke="#5a403a" stroke-width="2.2"/>
+  <path d="M424 96 L448 96" stroke="#5a403a" stroke-width="2.2" marker-end="url(#a)"/>
+
+  <!-- Step 3: Averaged chroma -->
+  <rect x="448" y="64" width="170" height="64" fill="none" stroke="#a33d52" stroke-width="3.5" rx="0"/>
+  <text x="533" y="92" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="16" font-weight="500" fill="#a33d52">12-bin chroma</text>
+  <text x="533" y="112" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#a33d52">(averaged)</text>
+
+  <!-- Arrow to matching -->
+  <path d="M618 96 L652 96" stroke="#5a403a" stroke-width="2.2" marker-end="url(#a)"/>
+
+  <!-- Step 4: Profile matching -->
+  <rect x="652" y="64" width="224" height="64" fill="none" stroke="#a33d52" stroke-width="3.5" rx="0"/>
+  <text x="764" y="92" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="16" font-weight="500" fill="#a33d52">Major / minor</text>
+  <text x="764" y="112" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#a33d52">(4 profile sets)</text>
+
+  <!-- Chroma bar chart -->
+  <rect x="60" y="256" width="38" height="72" fill="#a33d52"/>
+  <rect x="126" y="268" width="38" height="60" fill="#a33d52" opacity="0.25"/>
+  <rect x="192" y="280" width="38" height="48" fill="#a33d52" opacity="0.25"/>
+  <rect x="258" y="244" width="38" height="84" fill="#a33d52" opacity="0.25"/>
+  <rect x="324" y="232" width="38" height="96" fill="#a33d52"/>
+  <rect x="390" y="304" width="38" height="24" fill="#a33d52" opacity="0.25"/>
+  <rect x="456" y="316" width="38" height="12" fill="#b5a08e"/>
+  <rect x="522" y="240" width="38" height="88" fill="#a33d52"/>
+  <rect x="588" y="316" width="38" height="12" fill="#b5a08e"/>
+  <rect x="654" y="280" width="38" height="48" fill="#a33d52" opacity="0.3"/>
+  <rect x="720" y="316" width="38" height="12" fill="#b5a08e"/>
+  <rect x="786" y="304" width="38" height="24" fill="#a33d52" opacity="0.25"/>
+
+  <text x="79" y="344" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">C</text>
+  <text x="343" y="344" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">E</text>
+  <text x="541" y="344" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">G</text>
+
+  <text x="450" y="184" font-family="DM Sans, Arial, sans-serif" font-size="16" fill="#5a403a" text-anchor="middle">Goertzel resolves harmonics; CQT gives uniform semitone resolution. The averaged chroma captures both.</text>
+</svg>

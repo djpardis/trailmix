@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="220" viewBox="0 0 900 220" role="img" aria-label="beat salad pipeline">
+
+  <defs>
+    <marker id="a" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6" fill="none" stroke="#5a403a" stroke-width="1.2"/>
+    </marker>
+  </defs>
+
+  <text x="36" y="40" font-family="DM Sans, Arial, sans-serif" font-size="16" font-weight="500" fill="#5a403a">beat salad global estimate</text>
+
+  <rect x="24" y="72" width="160" height="72" fill="none" stroke="#5a403a" stroke-width="3.5" rx="0"/>
+  <text x="104" y="114" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="14" font-weight="500" fill="#5a403a">Mono PCM</text>
+
+  <path d="M184 108 L218 108" stroke="#5a403a" stroke-width="2.2" marker-end="url(#a)"/>
+
+  <rect x="218" y="72" width="176" height="72" fill="none" stroke="#a33d52" stroke-width="3.5" rx="0"/>
+  <text x="306" y="104" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="16" font-weight="500" fill="#a33d52">Spectral flux</text>
+  <text x="306" y="124" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#a33d52">(24-band Goertzel)</text>
+
+  <path d="M394 108 L428 108" stroke="#5a403a" stroke-width="2.2" marker-end="url(#a)"/>
+
+  <rect x="428" y="72" width="176" height="72" fill="none" stroke="#765f7b" stroke-width="3.5" rx="0"/>
+  <text x="516" y="114" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="16" font-weight="500" fill="#765f7b">Tempo period</text>
+
+  <path d="M604 108 L638 108" stroke="#5a403a" stroke-width="2.2" marker-end="url(#a)"/>
+
+  <rect x="638" y="72" width="240" height="72" fill="none" stroke="#a33d52" stroke-width="3.5" rx="0"/>
+  <text x="758" y="104" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="16" font-weight="500" fill="#a33d52">BPM + DP beats</text>
+  <text x="758" y="124" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#a33d52">(Ellis 2007)</text>
+
+  <text x="36" y="196" font-family="DM Sans, Arial, sans-serif" font-size="16" fill="#5a403a">Frames 1,024 / hop 512. Search 60 to 200 BPM. Beats snap to onsets via dynamic programming.</text>
+</svg>

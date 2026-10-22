@@ -1,59 +1,68 @@
 # Analyzer backends
 
-trail mix supports two development tracks in the same repository.
+trail mix supports a production default, a DSP-only build, and a contract for
+future learned or platform-native analyzers.
 
-## DSP default
+## Production default
 
-The default crates use deterministic Rust DSP:
+The default `trailmix` crate runs deterministic Rust DSP for tempo, beat,
+waveform, local key segments, chroma extraction, and 24-key DSP scores. Global
+key estimation then uses the compact key lime reranker when the `reranker`
+feature is enabled. The reranker embeds the selected seed-1729 weights and runs
+a pure Rust forward pass, so applications do not need ONNX Runtime, a model
+server, or a native inference library.
 
-- `beat-salad` for tempo, beat positions, and local tempo segments.
-- `key-lime` for global and local key estimation.
-- `sampler-platter` for compact waveform summaries.
-- `trailmix` for the combined `analysis-v1` result.
-- `trailmix-codecs` for optional audio-file decoding.
+The combined result remains the `analysis-v1` JSON object. `KeyAnalysis`
+records the estimator used for the global key and keeps the DSP key available
+for comparison.
 
-This backend is the default for Cueport and other applications that want local
-analysis without model checkpoints or an inference runtime. It builds without
-the benchmark model dependencies and keeps the `analysis-v1` JSON contract as
-the production integration target.
+## DSP-only build
 
-## Transformer and model candidates
+Applications that need deterministic DSP only can disable default features:
 
-First-party transformer or foundation-model work lives in `trailmix-models`.
-That crate defines the backend contract and metadata required for learned
-analysis while keeping the default DSP crates independent from model runtimes
-and weights.
+```sh
+cargo build -p trailmix --no-default-features
+cargo run -p trailmix-cli --no-default-features -- song.mp3
+```
 
-External projects remain benchmark baselines. They run through the external
-baseline harness under `benchmarks/baselines`, where source revisions, artifact
-hashes, licenses, training disclosures, preprocessing, and output conversion
-are recorded for each tool. The main Rust crates do not ship external model
-weights, conversion scripts, or third-party model execution code.
+This build keeps beat, tempo, waveform, chroma, local key segments, and DSP key
+estimation. It omits the embedded reranker weights and reports `dsp` as the key
+estimator.
 
-Concrete first-party model implementations can be added to `trailmix-models`
-after review. Cueport should receive a learned backend only when the
-application explicitly chooses the model artifact and runtime.
+## Codec wrapper
+
+`trailmix` starts from mono PCM supplied by the application. `trailmix-codecs`
+opens audio files, decodes common formats through Symphonia, prepares mono PCM,
+and calls the same analyzer. The codec wrapper is optional so applications that
+already own decoding do not take codec dependencies.
+
+## Future learned and platform-native analyzers
+
+`trailmix-models` defines the metadata and result contract for additional
+learned analyzers. Future backends should preserve the `analysis-v1` result
+shape or introduce a new versioned schema when the meaning of existing fields
+changes.
+
+External projects remain benchmark baselines under `benchmarks/baselines`,
+where source revisions, artifact hashes, licenses, training disclosures,
+preprocessing, and output conversion are recorded before a result is used.
 
 ## Comparison requirements
 
-Every model backend report must include:
+Every backend report must include:
 
-- Same-corpus accuracy under the same metric definitions as the DSP analyzer.
+- Same-corpus accuracy under the same metric definitions as the current
+  analyzer.
 - Mean and median analysis time per track.
 - Decode time separated from inference time when possible.
 - Wall-clock throughput on the same machine and thread count.
-- Model checkpoint size.
+- Model checkpoint size when the backend uses weights.
 - Runtime dependency size and required cache files.
 - Output JSON size under `analysis-v1`.
 - Hardware support for CPU, Apple Silicon, GPU, and WebAssembly.
 - Code license, weight license, and disclosed training datasets.
 
 Accuracy improvements should be reported together with their runtime,
-packaging, hardware, and licensing costs. The default DSP path remains the
-reference implementation for applications while the first-party model track
-develops in parallel.
-
-Do not hide accuracy losses behind local application constraints. If a backend
-is chosen because it is smaller, faster, or easier to ship, report the measured
-accuracy loss together with the measured efficiency gain and the reason that
-tradeoff fits the application.
+packaging, hardware, and licensing costs. If a backend is chosen because it is
+smaller, faster, or easier to ship, report the measured accuracy difference
+with the measured efficiency gain and the application reason for that choice.

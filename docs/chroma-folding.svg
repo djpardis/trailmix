@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="390" viewBox="0 0 900 390" role="img" aria-label="Chroma folding across octaves">
+
+  <!-- Pitch class labels -->
+  <text x="105" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">C</text>
+  <text x="168" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">C♯</text>
+  <text x="231" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">D</text>
+  <text x="294" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">D♯</text>
+  <text x="357" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">E</text>
+  <text x="420" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">F</text>
+  <text x="483" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">F♯</text>
+  <text x="546" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">G</text>
+  <text x="609" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">G♯</text>
+  <text x="672" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">A</text>
+  <text x="735" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">A♯</text>
+  <text x="798" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">B</text>
+
+  <!-- Octave row labels -->
+  <text x="52" y="54" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="end">oct 6</text>
+  <text x="52" y="90" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="end">oct 5</text>
+  <text x="52" y="126" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="end">oct 4</text>
+  <text x="52" y="162" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="end">oct 3</text>
+
+  <!-- Grid: 12 columns x 4 rows, C-major-ish -->
+  <!-- Row 1 (oct 6) -->
+  <rect x="81" y="38" width="48" height="24" rx="3" fill="#a33d52" opacity="0.3"/>
+  <rect x="144" y="38" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="207" y="38" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="270" y="38" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="333" y="38" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+  <rect x="396" y="38" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="459" y="38" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="522" y="38" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+  <rect x="585" y="38" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="648" y="38" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="711" y="38" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="774" y="38" width="48" height="24" rx="3" fill="#f0e8df"/>
+
+  <!-- Row 2 (oct 5) -->
+  <rect x="81" y="74" width="48" height="24" rx="3" fill="#a33d52" opacity="0.7"/>
+  <rect x="144" y="74" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="207" y="74" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+  <rect x="270" y="74" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="333" y="74" width="48" height="24" rx="3" fill="#a33d52" opacity="0.5"/>
+  <rect x="396" y="74" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="459" y="74" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="522" y="74" width="48" height="24" rx="3" fill="#a33d52" opacity="0.6"/>
+  <rect x="585" y="74" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="648" y="74" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+  <rect x="711" y="74" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="774" y="74" width="48" height="24" rx="3" fill="#f0e8df"/>
+
+  <!-- Row 3 (oct 4) -->
+  <rect x="81" y="110" width="48" height="24" rx="3" fill="#a33d52" opacity="0.9"/>
+  <rect x="144" y="110" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="207" y="110" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+  <rect x="270" y="110" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="333" y="110" width="48" height="24" rx="3" fill="#a33d52" opacity="0.7"/>
+  <rect x="396" y="110" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+  <rect x="459" y="110" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="522" y="110" width="48" height="24" rx="3" fill="#a33d52" opacity="0.8"/>
+  <rect x="585" y="110" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="648" y="110" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+  <rect x="711" y="110" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="774" y="110" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+
+  <!-- Row 4 (oct 3) -->
+  <rect x="81" y="146" width="48" height="24" rx="3" fill="#a33d52" opacity="0.4"/>
+  <rect x="144" y="146" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="207" y="146" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+  <rect x="270" y="146" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="333" y="146" width="48" height="24" rx="3" fill="#a33d52" opacity="0.3"/>
+  <rect x="396" y="146" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+  <rect x="459" y="146" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="522" y="146" width="48" height="24" rx="3" fill="#a33d52" opacity="0.35"/>
+  <rect x="585" y="146" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="648" y="146" width="48" height="24" rx="3" fill="#a33d52" opacity="0.25"/>
+  <rect x="711" y="146" width="48" height="24" rx="3" fill="#f0e8df"/>
+  <rect x="774" y="146" width="48" height="24" rx="3" fill="#f0e8df"/>
+
+  <!-- Fold annotation -->
+  <text x="450" y="198" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">fold octaves ↓</text>
+
+  <!-- Chroma bar chart -->
+  <rect x="84" y="222" width="42" height="120" fill="#a33d52"/>
+  <rect x="147" y="338" width="42" height="4" fill="#b5a08e"/>
+  <rect x="210" y="322" width="42" height="20" fill="#a33d52" opacity="0.5"/>
+  <rect x="273" y="338" width="42" height="4" fill="#b5a08e"/>
+  <rect x="336" y="252" width="42" height="90" fill="#a33d52"/>
+  <rect x="399" y="330" width="42" height="12" fill="#a33d52" opacity="0.4"/>
+  <rect x="462" y="338" width="42" height="4" fill="#b5a08e"/>
+  <rect x="525" y="242" width="42" height="100" fill="#a33d52"/>
+  <rect x="588" y="338" width="42" height="4" fill="#b5a08e"/>
+  <rect x="651" y="322" width="42" height="20" fill="#a33d52" opacity="0.5"/>
+  <rect x="714" y="338" width="42" height="4" fill="#b5a08e"/>
+  <rect x="777" y="332" width="42" height="10" fill="#a33d52" opacity="0.4"/>
+
+  <text x="105" y="360" font-family="DM Sans, Arial, sans-serif" font-size="16" fill="#5a403a" text-anchor="middle">C</text>
+  <text x="357" y="360" font-family="DM Sans, Arial, sans-serif" font-size="16" fill="#5a403a" text-anchor="middle">E</text>
+  <text x="546" y="360" font-family="DM Sans, Arial, sans-serif" font-size="16" fill="#5a403a" text-anchor="middle">G</text>
+
+  <text x="36" y="386" font-family="DM Sans, Arial, sans-serif" font-size="16" fill="#5a403a">Strong C, E, G bins match the C major Krumhansl-Kessler profile.</text>
+</svg>
