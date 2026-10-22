@@ -1016,7 +1016,7 @@ mod tests {
     fn rejects_silence() {
         let result = analyze(&vec![0.0; 44_100 * 5], 44_100, BeatConfig::default());
         assert_eq!(result.global_bpm, None);
-        assert!(result.beats.is_empty());
+        assert_eq!(result.beats, [] as [BeatPosition; 0]);
         assert!(!result.multi_tempo);
     }
 }

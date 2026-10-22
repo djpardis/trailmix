@@ -250,7 +250,10 @@ mod tests {
 
     #[test]
     fn handles_empty_and_non_finite_input() {
-        assert!(generate_overview(&[], 44_100, 100).columns.is_empty());
+        assert_eq!(
+            generate_overview(&[], 44_100, 100).columns,
+            [] as [WaveformColumn; 0]
+        );
 
         let overview = generate_overview(&[f32::NAN, f32::INFINITY], 44_100, 1);
         assert_eq!(
