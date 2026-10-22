@@ -12,7 +12,7 @@ The default crates use deterministic Rust DSP:
 - `trailmix` for the combined `analysis-v1` result.
 - `trailmix-codecs` for optional audio-file decoding.
 
-This path is the default for Cueport and other applications that want local
+This backend is the default for Cueport and other applications that want local
 analysis without model checkpoints or an inference runtime. It builds without
 the benchmark model dependencies and keeps the `analysis-v1` JSON contract as
 the production integration target.
