@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="320" viewBox="0 0 900 320" role="img" aria-labelledby="title desc">
+  <title id="title">key lime reranker flow</title>
+  <desc id="desc">Audio produces chroma frames and DSP key scores. A compact transformer reranker reads both and writes the selected key, estimator name, and DSP prior.</desc>
+  <defs>
+    <style>
+      .box { fill: none; stroke: #5a403a; stroke-width: 3; }
+      .feature { fill: none; stroke: #765f7b; stroke-width: 3.5; }
+      .accent { fill: none; stroke: #a33d52; stroke-width: 3.5; }
+      .tagbox { fill: #765f7b; }
+      .pill { fill: #a93649; }
+      .arrow { fill: none; stroke: #5a403a; stroke-width: 2.5; stroke-linecap: square; stroke-linejoin: miter; }
+      .label { fill: #171517; font: 700 18px "DM Sans", Arial, sans-serif; }
+      .body { fill: #5a403a; font: 400 14px "DM Sans", Arial, sans-serif; }
+      .mono { fill: #5d4861; font: 500 14px "DM Mono", ui-monospace, monospace; }
+      .tag { fill: #ffffff; font: 700 14px "DM Sans", Arial, sans-serif; }
+      .cap { fill: #5a403a; font: 500 16px "DM Sans", Arial, sans-serif; }
+    </style>
+    <marker id="ah" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6" fill="none" stroke="#5a403a" stroke-width="1.2"/>
+    </marker>
+  </defs>
+
+  <text class="cap" x="36" y="36">key lime global-key reranker</text>
+
+  <rect class="box" x="28" y="82" width="154" height="70" rx="0"/>
+  <text class="label" x="105" y="112" text-anchor="middle">PCM</text>
+  <text class="body" x="105" y="136" text-anchor="middle">mono samples</text>
+
+  <path class="arrow" d="M182 117 L222 117" marker-end="url(#ah)"/>
+
+  <rect class="feature" x="222" y="48" width="230" height="74" rx="0"/>
+  <text class="label" x="250" y="82">chroma frames</text>
+  <text class="body" x="250" y="105">pitch-class energy over time</text>
+
+  <rect class="feature" x="222" y="166" width="230" height="74" rx="0"/>
+  <text class="label" x="250" y="200">DSP key scores</text>
+  <text class="body" x="250" y="223">24 key candidates</text>
+
+  <path class="arrow" d="M452 85 L504 85 L504 137 L540 137" marker-end="url(#ah)"/>
+  <path class="arrow" d="M452 203 L504 203 L504 167 L540 167" marker-end="url(#ah)"/>
+
+  <rect class="tagbox" x="584" y="72" width="138" height="28" rx="0"/>
+  <text class="tag" x="653" y="92" text-anchor="middle">21,528 params</text>
+
+  <rect class="accent" x="540" y="112" width="254" height="96" rx="0"/>
+  <text class="label" x="568" y="150">transformer reranker</text>
+  <text class="body" x="568" y="176">one encoder layer</text>
+  <text class="body" x="568" y="196">Rust forward pass</text>
+
+  <path class="arrow" d="M794 160 L824 160" marker-end="url(#ah)"/>
+
+  <text class="mono" x="838" y="154">key</text>
+  <text class="body" x="838" y="178">selected</text>
+  <text class="body" x="838" y="198">global key</text>
+</svg>

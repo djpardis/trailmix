@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="500" viewBox="0 0 960 500" role="img" aria-label="trail mix crate architecture">
+  <defs>
+    <marker id="a" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6" fill="none" stroke="#5a403a" stroke-width="1.2"/>
+    </marker>
+    <style>
+      .box { fill: none; stroke: #5a403a; stroke-width: 3; }
+      .facade { fill: none; stroke: #a33d52; stroke-width: 3.5; }
+      .analyzer { fill: none; stroke: #765f7b; stroke-width: 3.5; }
+      .arrow { fill: none; stroke: #5a403a; stroke-width: 2.4; stroke-linecap: square; stroke-linejoin: miter; }
+      .title { font: 700 16px "DM Sans", Arial, sans-serif; fill: #171517; }
+      .muted { font: 400 14px "DM Sans", Arial, sans-serif; fill: #5a403a; }
+      .accent { font: 700 16px "DM Sans", Arial, sans-serif; fill: #a33d52; }
+      .part { font: 700 16px "DM Sans", Arial, sans-serif; fill: #a33d52; }
+      .mono { font: 500 14px "DM Mono", ui-monospace, monospace; fill: #5d4861; }
+      .cap { font: 700 13px "DM Sans", Arial, sans-serif; fill: #8a5a3c; letter-spacing: 0.08em; }
+    </style>
+  </defs>
+
+  <text class="cap" x="48" y="32">INPUT</text>
+  <rect class="box" x="48" y="44" width="174" height="62" rx="0"/>
+  <text class="title" x="76" y="73">audio file</text>
+  <text class="muted" x="76" y="93">optional input</text>
+
+  <path class="arrow" d="M222 75 L278 75" marker-end="url(#a)"/>
+
+  <rect class="box" x="278" y="44" width="218" height="62" rx="0"/>
+  <text class="mono" x="306" y="73">trailmix-codecs</text>
+  <text class="muted" x="306" y="93">decode when needed</text>
+
+  <path class="arrow" d="M496 75 L550 75" marker-end="url(#a)"/>
+
+  <rect class="box" x="550" y="44" width="314" height="62" rx="0"/>
+  <text class="title" x="578" y="73">AudioBuffer + config</text>
+  <text class="muted" x="578" y="93">app code can start here</text>
+
+  <path class="arrow" d="M707 106 L707 132 L248 132 L248 176" marker-end="url(#a)"/>
+  <path class="arrow" d="M707 106 L707 204"/>
+
+  <text class="cap" x="60" y="158">ONE CALL</text>
+  <rect class="facade" x="60" y="176" width="376" height="74" rx="0"/>
+  <text class="accent" x="88" y="208">trailmix::analyze</text>
+  <text class="muted" x="88" y="230">runs all analyzers and merges JSON</text>
+
+  <path class="arrow" d="M248 250 L248 302" marker-end="url(#a)"/>
+
+  <rect class="box" x="116" y="302" width="264" height="58" rx="0"/>
+  <text class="mono" x="158" y="337">analysis-v1 JSON</text>
+
+  <text class="cap" x="520" y="158">USE SEPARATELY</text>
+  <path class="arrow" d="M580 204 L832 204"/>
+  <path class="arrow" d="M580 204 L580 242" marker-end="url(#a)"/>
+  <path class="arrow" d="M706 204 L706 326" marker-end="url(#a)"/>
+  <path class="arrow" d="M832 204 L832 242" marker-end="url(#a)"/>
+
+  <rect class="analyzer" x="478" y="242" width="204" height="62" rx="0"/>
+  <text class="part" x="506" y="270">beat-salad</text>
+  <text class="muted" x="506" y="290">tempo and beats</text>
+
+  <rect class="analyzer" x="604" y="326" width="204" height="62" rx="0"/>
+  <text class="part" x="632" y="354">key-lime</text>
+  <text class="muted" x="632" y="374">key and chroma</text>
+
+  <rect class="analyzer" x="730" y="242" width="204" height="62" rx="0"/>
+  <text class="part" x="758" y="270">sampler-platter</text>
+  <text class="muted" x="758" y="290">waveform columns</text>
+
+  <text class="muted" x="574" y="430">Call one analyzer crate directly when needed.</text>
+</svg>
