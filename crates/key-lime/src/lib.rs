@@ -1015,7 +1015,7 @@ mod tests {
             },
         );
 
-        assert!(!frames.is_empty());
+        assert_ne!(frames.len(), 0);
         assert!(frames[0].center_seconds > 0.0);
         for frame in frames {
             let total = frame.values.iter().sum::<f32>();

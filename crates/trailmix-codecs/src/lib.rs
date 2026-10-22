@@ -318,6 +318,6 @@ mod tests {
 
         assert_eq!(decoded.sample_rate, 44_100);
         assert_eq!(decoded.source_channels, 2);
-        assert!(!decoded.samples.is_empty());
+        assert_ne!(decoded.samples.len(), 0);
     }
 }
