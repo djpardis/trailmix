@@ -1,6 +1,15 @@
 //! Compact chroma-based musical key estimation.
+//!
+//! The DSP scorer correlates median chroma with four key-profile pairs. With
+//! the default `reranker` feature, a compact transformer then reranks those 24
+//! scores using the frame-level chroma sequence; see [`rerank_key_scores`].
 
 mod cqt;
+#[cfg(feature = "reranker")]
+mod reranker;
+
+#[cfg(feature = "reranker")]
+pub use reranker::{RERANKER_MAX_FRAMES, RERANKER_WEIGHTS_SHA256, rerank_key_scores};
 
 use std::fmt;
 
@@ -85,11 +94,42 @@ impl fmt::Display for MusicalKey {
     }
 }
 
+/// Method that selects the global key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyEstimator {
+    /// Deterministic key-profile scoring only.
+    Dsp,
+    /// DSP scoring followed by the compact transformer reranker.
+    Reranker,
+}
+
+impl Default for KeyEstimator {
+    fn default() -> Self {
+        if cfg!(feature = "reranker") {
+            Self::Reranker
+        } else {
+            Self::Dsp
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct KeyAnalysis {
     pub version: u32,
     pub key: Option<MusicalKey>,
+    /// Confidence in `key`. For the DSP estimator this is the score margin
+    /// between the two best keys; for the reranker it is the softmax
+    /// probability of the selected key.
     pub confidence: f32,
+    /// Method that produced `key`. Results stored before version 7 omit this
+    /// field and deserialize as DSP.
+    #[serde(default = "dsp_estimator")]
+    pub estimator: KeyEstimator,
+    /// Global key chosen by the DSP scorer, kept for comparison when the
+    /// reranker selects `key`.
+    #[serde(default)]
+    pub dsp_key: Option<MusicalKey>,
     pub chroma: [f32; 12],
     pub segments: Vec<KeySegment>,
     /// True when another key in the file covers enough duration to matter
@@ -127,6 +167,11 @@ pub struct KeyConfig {
     /// Minimum segment duration in seconds. Segments shorter than this are
     /// absorbed by their longest neighbor. Default 12.0.
     pub minimum_segment_seconds: f32,
+    /// Global key method. Defaults to the reranker when the `reranker` feature
+    /// is enabled. Selecting the reranker without that feature falls back to
+    /// DSP scoring, and the result reports the estimator that actually ran.
+    #[serde(default)]
+    pub estimator: KeyEstimator,
 }
 
 impl Default for KeyConfig {
@@ -141,6 +186,7 @@ impl Default for KeyConfig {
             alternate_coverage_threshold: 0.25,
             segment_confidence_threshold: 0.35,
             minimum_segment_seconds: 12.0,
+            estimator: KeyEstimator::default(),
         }
     }
 }
@@ -196,19 +242,28 @@ pub fn analyze(samples: &[f32], sample_rate: u32, config: KeyConfig) -> KeyAnaly
     let duration_seconds = samples.len() as f64 / f64::from(sample_rate);
     let segments = estimate_segments(&frame_chromas, duration_seconds, key, confidence, config);
 
-    let final_key = if segments.len() > 1 {
+    let dsp_key = if segments.len() > 1 {
         longest_segment_key(&segments).unwrap_or(key)
     } else {
         key
     };
+    let (estimator, final_key, confidence) = select_global_key(
+        &frame_chromas,
+        &chroma,
+        dsp_key,
+        confidence,
+        config.estimator,
+    );
 
     let alternate =
         significant_alternate_key(&segments, final_key, config.alternate_coverage_threshold);
 
     KeyAnalysis {
-        version: 6,
+        version: 7,
         key: Some(final_key),
         confidence,
+        estimator,
+        dsp_key: Some(dsp_key),
         chroma,
         segments,
         multi_key: alternate.is_some(),
@@ -322,11 +377,62 @@ fn longest_segment_key(segments: &[KeySegment]) -> Option<MusicalKey> {
         .map(|seg| seg.key)
 }
 
+#[cfg(feature = "reranker")]
+fn select_global_key(
+    frames: &[ChromaFrame],
+    chroma: &[f32; 12],
+    dsp_key: MusicalKey,
+    dsp_confidence: f32,
+    estimator: KeyEstimator,
+) -> (KeyEstimator, MusicalKey, f32) {
+    if estimator == KeyEstimator::Dsp {
+        return (KeyEstimator::Dsp, dsp_key, dsp_confidence);
+    }
+    let logits = rerank_key_scores(frames, &classify_key_scores(chroma));
+    let (index, _) = logits
+        .iter()
+        .enumerate()
+        .max_by(|(_, left), (_, right)| left.total_cmp(right))
+        .unwrap_or((0, &0.0));
+    let maximum = logits[index];
+    let total = logits
+        .iter()
+        .map(|logit| (logit - maximum).exp())
+        .sum::<f32>();
+    (KeyEstimator::Reranker, key_from_index(index), 1.0 / total)
+}
+
+#[cfg(not(feature = "reranker"))]
+fn select_global_key(
+    _frames: &[ChromaFrame],
+    _chroma: &[f32; 12],
+    dsp_key: MusicalKey,
+    dsp_confidence: f32,
+    _estimator: KeyEstimator,
+) -> (KeyEstimator, MusicalKey, f32) {
+    (KeyEstimator::Dsp, dsp_key, dsp_confidence)
+}
+
+/// Map a `tonic + 12 * mode` index from [`classify_key_scores`] to a key.
+#[cfg_attr(not(feature = "reranker"), allow(dead_code))]
+fn key_from_index(index: usize) -> MusicalKey {
+    MusicalKey {
+        tonic: PitchClass::ALL[index % 12],
+        mode: if index < 12 { Mode::Major } else { Mode::Minor },
+    }
+}
+
+fn dsp_estimator() -> KeyEstimator {
+    KeyEstimator::Dsp
+}
+
 fn empty_analysis() -> KeyAnalysis {
     KeyAnalysis {
-        version: 6,
+        version: 7,
         key: None,
         confidence: 0.0,
+        estimator: KeyEstimator::Dsp,
+        dsp_key: None,
         chroma: [0.0; 12],
         segments: Vec::new(),
         multi_key: false,

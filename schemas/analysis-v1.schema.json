@@ -89,6 +89,8 @@
         "version",
         "key",
         "confidence",
+        "estimator",
+        "dsp_key",
         "chroma",
         "segments",
         "multi_key",
@@ -96,11 +98,15 @@
         "alternate_coverage"
       ],
       "properties": {
-        "version": { "const": 6 },
+        "version": { "const": 7 },
         "key": {
           "anyOf": [{ "$ref": "#/$defs/musicalKey" }, { "type": "null" }]
         },
         "confidence": { "type": "number" },
+        "estimator": { "enum": ["dsp", "reranker"] },
+        "dsp_key": {
+          "anyOf": [{ "$ref": "#/$defs/musicalKey" }, { "type": "null" }]
+        },
         "chroma": {
           "type": "array",
           "minItems": 12,

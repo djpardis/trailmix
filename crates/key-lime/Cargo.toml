@@ -6,8 +6,15 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["reranker"]
+reranker = []
+
 [dependencies]
 serde.workspace = true
+
+[dev-dependencies]
+serde_json = "1"
 
 [lints]
 workspace = true
