@@ -6,9 +6,13 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["reranker"]
+reranker = ["key-lime/reranker"]
+
 [dependencies]
 beat-salad = { path = "../beat-salad" }
-key-lime = { path = "../key-lime" }
+key-lime = { path = "../key-lime", default-features = false }
 sampler-platter = { path = "../sampler-platter" }
 serde.workspace = true
 

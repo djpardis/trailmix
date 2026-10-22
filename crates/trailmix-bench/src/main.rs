@@ -112,6 +112,9 @@ struct TrackResult {
     exact_key_match: Option<bool>,
     mirex_score: Option<f32>,
     key_relation: Option<KeyRelation>,
+    key_estimator: Option<trailmix::KeyEstimator>,
+    dsp_key: Option<String>,
+    dsp_mirex_score: Option<f32>,
     tempo_segment_mean_absolute_error: Option<f32>,
     key_segment_exact_accuracy: Option<f32>,
     detected_key_segments: Vec<DetectedKeySegment>,
@@ -865,6 +868,15 @@ fn analyze_manifest_track(
         analysis.beat.global_bpm,
         analysis.key.key,
     );
+    let (apple_music_understanding_bpm, apple_music_understanding_key) =
+        apple_music_understanding_observation(track);
+    let (key_scores, key_chroma_frames) = key_training_features(
+        key_frame_features,
+        &decoded.samples,
+        decoded.sample_rate,
+        config.key,
+        &analysis.key.chroma,
+    );
 
     TrackResult {
         id: track.id.clone(),
@@ -885,10 +897,10 @@ fn analyze_manifest_track(
         exact_key_match: expected_key.map(|expected| Some(expected) == detected_key),
         mirex_score: mirex_of(expected_key, detected_key),
         key_relation: harmonic_relation(expected_key, detected_key),
-        tempo_segment_mean_absolute_error: tempo_segment_error(
-            &track.expected_tempo_segments,
-            &analysis,
-        ),
+        key_estimator: Some(analysis.key.estimator),
+        dsp_key: analysis.key.dsp_key.map(|key| key.to_string()),
+        dsp_mirex_score: mirex_of(expected_key, analysis.key.dsp_key),
+        tempo_segment_mean_absolute_error: expected_tempo_segment_error(track, &analysis),
         key_segment_exact_accuracy,
         detected_key_segments: serialize_key_segments(&analysis.key.segments),
         beat_f1: beat_scores.map(|scores| scores.f1),
@@ -905,27 +917,16 @@ fn analyze_manifest_track(
         serato_bpm_absolute_agreement: serato_scores.bpm_absolute,
         serato_bpm_octave_aware_absolute_agreement: serato_scores.bpm_octave_aware,
         serato_exact_key_agreement: serato_scores.exact_key,
-        apple_music_understanding_bpm: track
-            .apple_music_understanding
-            .as_ref()
-            .and_then(|observation| observation.bpm),
-        apple_music_understanding_key: track
-            .apple_music_understanding
-            .as_ref()
-            .and_then(|observation| observation.key.clone()),
+        apple_music_understanding_bpm,
+        apple_music_understanding_key,
         apple_music_understanding_bpm_absolute_agreement: apple_music_understanding_scores
             .bpm_absolute,
         apple_music_understanding_bpm_octave_aware_absolute_agreement:
             apple_music_understanding_scores.bpm_octave_aware,
         apple_music_understanding_exact_key_agreement: apple_music_understanding_scores.exact_key,
         chroma: Some(analysis.key.chroma),
-        key_scores: key_scores_for_training(key_frame_features, &analysis.key.chroma),
-        key_chroma_frames: serialize_chroma_frames(
-            key_frame_features,
-            &decoded.samples,
-            decoded.sample_rate,
-            config.key,
-        ),
+        key_scores,
+        key_chroma_frames,
         error: None,
     }
 }
@@ -976,6 +977,15 @@ fn analyze_manifest_track_fast(
         analysis.beat.global_bpm,
         analysis.key.key,
     );
+    let (apple_music_understanding_bpm, apple_music_understanding_key) =
+        apple_music_understanding_observation(track);
+    let (key_scores, key_chroma_frames) = key_training_features(
+        key_frame_features,
+        &decoded.samples,
+        decoded.sample_rate,
+        config.key,
+        &analysis.key.chroma,
+    );
 
     TrackResult {
         id: track.id.clone(),
@@ -996,10 +1006,10 @@ fn analyze_manifest_track_fast(
         exact_key_match: expected_key.map(|expected| Some(expected) == detected_key),
         mirex_score: mirex_of(expected_key, detected_key),
         key_relation: harmonic_relation(expected_key, detected_key),
-        tempo_segment_mean_absolute_error: tempo_segment_error(
-            &track.expected_tempo_segments,
-            &analysis,
-        ),
+        key_estimator: Some(analysis.key.estimator),
+        dsp_key: analysis.key.dsp_key.map(|key| key.to_string()),
+        dsp_mirex_score: mirex_of(expected_key, analysis.key.dsp_key),
+        tempo_segment_mean_absolute_error: expected_tempo_segment_error(track, &analysis),
         key_segment_exact_accuracy,
         detected_key_segments: serialize_key_segments(&analysis.key.segments),
         beat_f1: beat_scores.map(|scores| scores.f1),
@@ -1016,27 +1026,16 @@ fn analyze_manifest_track_fast(
         serato_bpm_absolute_agreement: serato_scores.bpm_absolute,
         serato_bpm_octave_aware_absolute_agreement: serato_scores.bpm_octave_aware,
         serato_exact_key_agreement: serato_scores.exact_key,
-        apple_music_understanding_bpm: track
-            .apple_music_understanding
-            .as_ref()
-            .and_then(|observation| observation.bpm),
-        apple_music_understanding_key: track
-            .apple_music_understanding
-            .as_ref()
-            .and_then(|observation| observation.key.clone()),
+        apple_music_understanding_bpm,
+        apple_music_understanding_key,
         apple_music_understanding_bpm_absolute_agreement: apple_music_understanding_scores
             .bpm_absolute,
         apple_music_understanding_bpm_octave_aware_absolute_agreement:
             apple_music_understanding_scores.bpm_octave_aware,
         apple_music_understanding_exact_key_agreement: apple_music_understanding_scores.exact_key,
         chroma: Some(analysis.key.chroma),
-        key_scores: key_scores_for_training(key_frame_features, &analysis.key.chroma),
-        key_chroma_frames: serialize_chroma_frames(
-            key_frame_features,
-            &decoded.samples,
-            decoded.sample_rate,
-            config.key,
-        ),
+        key_scores,
+        key_chroma_frames,
         error: None,
     }
 }
@@ -1073,6 +1072,9 @@ fn failed_track(track: &TrackAnnotation, error: String) -> TrackResult {
         exact_key_match: None,
         mirex_score: None,
         key_relation: None,
+        key_estimator: None,
+        dsp_key: None,
+        dsp_mirex_score: None,
         tempo_segment_mean_absolute_error: None,
         key_segment_exact_accuracy: None,
         detected_key_segments: Vec::new(),
@@ -1154,6 +1156,34 @@ fn serialize_chroma_frames(
             chroma: frame.values,
         })
         .collect()
+}
+
+fn key_training_features(
+    enabled: bool,
+    samples: &[f32],
+    sample_rate: u32,
+    config: trailmix::KeyConfig,
+    chroma: &[f32; 12],
+) -> (Option<[f32; 24]>, Vec<KeyChromaFrame>) {
+    (
+        key_scores_for_training(enabled, chroma),
+        serialize_chroma_frames(enabled, samples, sample_rate, config),
+    )
+}
+
+fn apple_music_understanding_observation(track: &TrackAnnotation) -> (Option<f32>, Option<String>) {
+    let observation = track.apple_music_understanding.as_ref();
+    (
+        observation.and_then(|observation| observation.bpm),
+        observation.and_then(|observation| observation.key.clone()),
+    )
+}
+
+fn expected_tempo_segment_error(
+    track: &TrackAnnotation,
+    analysis: &trailmix::Analysis,
+) -> Option<f32> {
+    tempo_segment_error(&track.expected_tempo_segments, analysis)
 }
 
 /// Emit DSP key candidate scores only when training features are requested,

@@ -32,12 +32,17 @@
     "alternate_coverage": 0.0
   },
   "key": {
-    "version": 6,
+    "version": 7,
     "key": {
       "tonic": "A",
       "mode": "Minor"
     },
     "confidence": 0.5,
+    "estimator": "reranker",
+    "dsp_key": {
+      "tonic": "C",
+      "mode": "Major"
+    },
     "chroma": [
       0.0,
       0.0,

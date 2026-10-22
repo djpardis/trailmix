@@ -1,6 +1,6 @@
 use trailmix::{
-    Analysis, BeatAnalysis, BeatPosition, KeyAnalysis, KeySegment, Mode, MusicalKey, PitchClass,
-    TempoSegment, WaveformColumn, WaveformOverview,
+    Analysis, BeatAnalysis, BeatPosition, KeyAnalysis, KeyEstimator, KeySegment, Mode, MusicalKey,
+    PitchClass, TempoSegment, WaveformColumn, WaveformOverview,
 };
 
 #[test]
@@ -37,12 +37,17 @@ fn analysis_v1_json_matches_golden_fixture() {
             alternate_coverage: 0.0,
         },
         key: KeyAnalysis {
-            version: 6,
+            version: 7,
             key: Some(MusicalKey {
                 tonic: PitchClass::A,
                 mode: Mode::Minor,
             }),
             confidence: 0.5,
+            estimator: KeyEstimator::Reranker,
+            dsp_key: Some(MusicalKey {
+                tonic: PitchClass::C,
+                mode: Mode::Major,
+            }),
             chroma: [0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0],
             segments: vec![KeySegment {
                 start_seconds: 0.0,
