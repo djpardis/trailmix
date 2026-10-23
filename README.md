@@ -69,35 +69,6 @@ The FOSSY 2026 talk,
 introduces the DSP analysis for tempo, beat, key, and waveform data. It predates
 the compact key reranker, so its key results use the DSP-only estimator.
 
-## Analyzers
-
-<p>
-  <img src="docs/beat-salad-card.png" alt="beat salad illustration" width="96">
-</p>
-
-### [beat salad](crates/beat-salad)
-
-Finds the tempo of a track and where its beats fall, including places where the
-tempo changes.
-
-<p>
-  <img src="docs/key-lime-card.png" alt="key lime illustration" width="96">
-</p>
-
-### [key lime](crates/key-lime)
-
-Estimates the musical key of a track and of sections where the key changes. A
-compact transformer reranker chooses the global key.
-
-<p>
-  <img src="docs/sampler-platter-card.png" alt="sampler platter illustration" width="96">
-</p>
-
-### [sampler platter](crates/sampler-platter)
-
-Summarizes a track into waveform columns for drawing an overview without storing
-the full audio.
-
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local checks, data rules, and commit
