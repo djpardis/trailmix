@@ -71,38 +71,32 @@ the compact key reranker, so its key results use the DSP-only estimator.
 
 ## Analyzers
 
-<article class="analyzer-card">
-  <img class="analyzer-logo" src="docs/beat-salad-card.png" alt="beat salad illustration">
-  <div class="analyzer-title-row">
-    <h3 class="part-name">beat salad</h3>
-    <a class="crate-link" href="https://github.com/djpardis/trailmix/tree/main/crates/beat-salad" aria-label="View beat-salad crate">
-      <svg class="crate-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
-    </a>
-  </div>
-  <p>Finds the tempo of a track and where its beats fall, including places where the tempo changes.</p>
-</article>
+<p>
+  <img src="docs/beat-salad-card.png" alt="beat salad illustration" width="96">
+</p>
 
-<article class="analyzer-card">
-  <img class="analyzer-logo" src="docs/key-lime-card.png" alt="key lime illustration">
-  <div class="analyzer-title-row">
-    <h3 class="part-name">key lime</h3>
-    <a class="crate-link" href="https://github.com/djpardis/trailmix/tree/main/crates/key-lime" aria-label="View key-lime crate">
-      <svg class="crate-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
-    </a>
-  </div>
-  <p>Estimates the musical key of a track and of sections where the key changes. A compact transformer reranker chooses the global key.</p>
-</article>
+### [beat salad](crates/beat-salad)
 
-<article class="analyzer-card">
-  <img class="analyzer-logo" src="docs/sampler-platter-card.png" alt="sampler platter illustration">
-  <div class="analyzer-title-row">
-    <h3 class="part-name">sampler platter</h3>
-    <a class="crate-link" href="https://github.com/djpardis/trailmix/tree/main/crates/sampler-platter" aria-label="View sampler-platter crate">
-      <svg class="crate-link-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
-    </a>
-  </div>
-  <p>Summarizes a track into waveform columns for drawing an overview without storing the full audio.</p>
-</article>
+Finds the tempo of a track and where its beats fall, including places where the
+tempo changes.
+
+<p>
+  <img src="docs/key-lime-card.png" alt="key lime illustration" width="96">
+</p>
+
+### [key lime](crates/key-lime)
+
+Estimates the musical key of a track and of sections where the key changes. A
+compact transformer reranker chooses the global key.
+
+<p>
+  <img src="docs/sampler-platter-card.png" alt="sampler platter illustration" width="96">
+</p>
+
+### [sampler platter](crates/sampler-platter)
+
+Summarizes a track into waveform columns for drawing an overview without storing
+the full audio.
 
 ## Contributing
 
