@@ -63,6 +63,8 @@ POINT_COLORS = {
     "skey": COLORS["ink"],
 }
 
+FONT_SIZE = 17
+
 OFFSETS = {
     "kl_dsp": (-26, 14),
     "kl_fmak": (-42, -26),
@@ -99,7 +101,7 @@ def main() -> None:
         }
     )
 
-    fig, ax = plt.subplots(figsize=(8.2, 5.4), dpi=160)
+    fig, ax = plt.subplots(figsize=(10.0, 6.5), dpi=160)
     fig.patch.set_facecolor(COLORS["paper"])
     ax.set_facecolor(COLORS["paper"])
 
@@ -123,27 +125,30 @@ def main() -> None:
             textcoords="offset points",
             ha="left" if dx >= 0 else "right",
             va="center",
-            fontsize=10.5,
-            fontweight="700" if system == "kl_fmak" else "500",
+            fontsize=FONT_SIZE,
+            fontweight="500",
             color=POINT_COLORS[system],
             linespacing=1.05,
         )
 
     ax.set_xscale("log")
-    ax.set_xlim(0.5, 800)
-    ax.set_ylim(52.5, 78.5)
-    ax.xaxis.set_major_locator(FixedLocator([1, 10, 100, 1000]))
+    ax.set_xlim(0.45, 620)
+    ax.set_ylim(52.0, 78.5)
+    ax.xaxis.set_major_locator(FixedLocator([1, 10, 100, 500]))
     ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _pos: f"{value:g}"))
     ax.yaxis.set_major_locator(FixedLocator([55, 60, 65, 70, 75]))
 
-    ax.grid(True, which="major", color=COLORS["grid"], linewidth=1.0)
-    ax.tick_params(colors=COLORS["muted"], labelsize=10.5, length=0)
-    for spine in ax.spines.values():
-        spine.set_color(COLORS["raisin"])
+    ax.grid(True, which="major", axis="y", color=COLORS["grid"], linewidth=1.0)
+    ax.tick_params(colors=COLORS["muted"], labelsize=FONT_SIZE, length=0)
+    ax.tick_params(which="minor", bottom=False, left=False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color(COLORS["raisin"])
+    ax.spines["bottom"].set_color(COLORS["raisin"])
 
-    ax.set_xlabel("Installed footprint (MB, log scale)", color=COLORS["ink"], fontsize=12, fontweight="700", labelpad=10)
-    ax.set_ylabel("FMAKv2 MIREX key score (%)", color=COLORS["ink"], fontsize=12, fontweight="700", labelpad=10)
-    ax.set_title("Key accuracy versus installed footprint", color=COLORS["ink"], fontsize=16, fontweight="700", pad=14)
+    ax.set_xlabel("Installed footprint (MB, log scale)", color=COLORS["ink"], fontsize=FONT_SIZE, fontweight="500", labelpad=10)
+    ax.set_ylabel("FMAKv2 MIREX key score (%)", color=COLORS["ink"], fontsize=FONT_SIZE, fontweight="500", labelpad=10)
+    ax.set_title("Key accuracy versus installed footprint", color=COLORS["ink"], fontsize=FONT_SIZE, fontweight="500", pad=14)
 
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout(pad=1.0)

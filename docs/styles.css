@@ -141,6 +141,7 @@ code,
 
 .nav-link {
   display: inline-flex;
+  gap: 8px;
   align-items: center;
   min-width: 0;
   color: #fff;
@@ -153,11 +154,21 @@ code,
   white-space: nowrap;
 }
 
-.architecture-link svg {
-  display: none;
-  width: 24px;
-  height: 24px;
+.nav-link svg {
+  display: block;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.nav-link svg circle {
   fill: currentColor;
+  stroke: none;
 }
 
 .repository-link {
@@ -215,9 +226,9 @@ code,
 }
 
 .diagram {
-  margin: 16px 0 30px;
+  margin: 12px 0 18px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   justify-items: center;
   width: 100%;
   max-width: 680px;
@@ -230,11 +241,51 @@ code,
 }
 
 .diagram figcaption {
-  max-width: 620px;
+  margin: 0;
+  max-width: 680px;
   color: var(--muted);
   font-size: var(--type-meta);
   line-height: 1.5;
   text-align: center;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+  max-width: 680px;
+}
+
+.metric-card {
+  border: 1px solid color-mix(in srgb, var(--cranberry) 28%, transparent);
+  border-radius: 0;
+  padding: 14px;
+  background: color-mix(in srgb, var(--paper) 80%, white);
+}
+
+.metric-card h3 {
+  margin-bottom: 10px;
+  color: var(--cranberry);
+  font-size: var(--type-body);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.metric-card p {
+  margin: 0;
+  color: var(--body);
+  font-size: var(--type-body);
+  line-height: 1.45;
+}
+
+.metric-card p + p {
+  margin-top: 6px;
+}
+
+.metric-card strong {
+  color: var(--ink);
+  font-weight: 800;
 }
 
 .single-column-grid .col-main {
@@ -269,6 +320,11 @@ code,
   width: 100vw;
   background: var(--almond);
   pointer-events: none;
+}
+
+.side-section {
+  display: grid;
+  gap: 36px;
 }
 
 /* ── Typography ──────────────────────────────────────────────── */
@@ -366,6 +422,21 @@ a .project-name {
 }
 
 .part-name {
+  color: var(--cranberry);
+  font-weight: 800;
+}
+
+.crate-name {
+  padding: 0;
+  color: var(--cranberry);
+  background: transparent;
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  font-weight: 800;
+}
+
+.output-label {
   color: var(--cranberry);
   font-weight: 800;
 }
@@ -489,10 +560,15 @@ a .project-name {
   color: var(--cranberry);
 }
 
+.analyzer-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .crate-link {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
   color: var(--cranberry);
   text-decoration: none;
 }
@@ -510,7 +586,7 @@ a .project-name {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.55;
+  opacity: 1;
 }
 
 .crate-link:hover .crate-link-icon {
@@ -523,33 +599,6 @@ a .project-name {
   font-size: var(--type-body);
   font-weight: 500;
   line-height: 1.5;
-}
-
-.analyzer-facts {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-}
-
-.analyzer-facts div {
-  display: grid;
-  gap: 2px;
-}
-
-.analyzer-facts dt {
-  color: var(--raisin);
-  font-family: "DM Mono", monospace;
-  font-size: var(--type-meta);
-  font-weight: 500;
-  letter-spacing: 0.06em;
-}
-
-.analyzer-facts dd {
-  margin: 0;
-  color: var(--ink);
-  font-size: var(--type-body);
-  font-weight: 700;
-  line-height: 1.3;
 }
 
 /* ── Footer ──────────────────────────────────────────────────── */
@@ -642,8 +691,12 @@ a .project-name {
   }
 
   .col-side {
-    padding: 36px var(--page-padding);
+    padding: 36px var(--page-padding) 48px;
     margin-inline: calc(-1 * var(--page-padding));
+  }
+
+  .side-section {
+    gap: 42px;
   }
 
   .col-side::after {
@@ -654,6 +707,10 @@ a .project-name {
     min-height: 0;
     padding-block: 28px;
   }
+
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 620px) {
@@ -661,12 +718,14 @@ a .project-name {
     display: none;
   }
 
-  .architecture-link span {
+  .site-nav span {
     display: none;
   }
 
-  .architecture-link svg {
-    display: block;
+  .nav-link svg,
+  .repository-link svg {
+    width: 24px;
+    height: 24px;
   }
 }
 
@@ -685,15 +744,6 @@ a .project-name {
 
   .site-nav {
     gap: 14px;
-  }
-
-  .repository-link span {
-    display: none;
-  }
-
-  .repository-link svg {
-    width: 24px;
-    height: 24px;
   }
 
   .intro-body {

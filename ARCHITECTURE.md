@@ -1,10 +1,10 @@
 # Architecture
 
 **trail mix** is a Rust workspace. beat salad, key lime, and sampler platter
-are independent analyzer crates. `trailmix` is a facade that
-runs all three over one audio buffer when an application wants a single
-versioned result. `trailmix-codecs` decodes audio files into the mono PCM the
-analyzers expect.
+are independent analyzer crates. <strong class="crate-name">trailmix</strong>
+is a facade that runs all three over one audio buffer when an application wants
+a single versioned result. <strong class="crate-name">trailmix-codecs</strong>
+decodes audio files into the mono PCM the analyzers expect.
 
 <figure class="diagram">
   <img src="docs/crate-architecture.svg" alt="Crate architecture diagram. A caller passes an AudioBuffer and config to trailmix analyze, which merges results from beat-salad, key-lime, and sampler-platter.">
@@ -14,8 +14,36 @@ analyzers expect.
 
 Both entry points use an `AudioBuffer`, which is borrowed mono samples plus a
 sample rate, and an `AnalysisConfig` with per-analyzer settings. Applications
-that need all outputs call the facade and store `analysis-v1`; applications that
-only need tempo, key, or waveform data can call the matching analyzer crate.
+that need all outputs call the facade and store the serialized `Analysis`
+result; applications that only need tempo, key, or waveform data can call the
+matching analyzer crate. Direct crate calls return the same nested result types
+used by the facade: `BeatAnalysis`, `KeyAnalysis`, and `WaveformOverview`.
+
+## Result types
+
+The combined result contains `beat: BeatAnalysis`, `key: KeyAnalysis`, and
+`waveform: WaveformOverview`. Calling an analyzer crate directly returns the
+same result type for that analyzer.
+
+- <span class="output-label">beat salad</span>: `BeatAnalysis` with tempo and
+  beat data. `global_bpm` is the precise track-level tempo estimate.
+  `display_bpm` is the UI-friendly rounded BPM chosen to fit the beat timing.
+  `tempo_segments` are sections where BPM changes over time. `beats` are timed
+  beat positions with a confidence value and 4/4 `position_in_bar`.
+- <span class="output-label">key lime</span>: `KeyAnalysis` with global key,
+  local key segments, the key estimator used, and the DSP key used as the
+  transformer reranker prior. `key` is the selected global key. `segments` are
+  local key regions. `estimator` records whether the result came from DSP or
+  the reranker. `dsp_key` keeps the DSP prior. `chroma` stores the global
+  pitch-class profile.
+- <span class="output-label">sampler platter</span>: `WaveformOverview` with
+  compact waveform columns for drawing an overview without storing full PCM.
+  `columns` are display buckets. Each column stores `min`, `max`, and `rms`
+  values.
+- Benchmark features: optional training and evaluation features.
+  `key_chroma_frames` are frame-level chroma vectors. `key_scores` are DSP key
+  candidate scores. Confidence values are carried on beat, tempo-segment, key,
+  and key-segment outputs.
 
 ## beat salad
 
@@ -23,6 +51,7 @@ beat salad estimates tempo, beat positions, and local tempo segments.
 
 <figure class="diagram">
   <img src="docs/beat-salad-pipeline.svg" alt="beat salad pipeline diagram. Mono PCM flows through spectral flux, tempo-period estimation, and dynamic-programming beat tracking to produce BPM and beats.">
+  <figcaption>beat salad global estimate. 1,024-frame window, 512 hop, and 60-200 BPM search range.</figcaption>
 </figure>
 
 - Onset detection uses 24-band spectral flux rather than RMS energy
@@ -50,6 +79,7 @@ global and segment levels.
 
 <figure class="diagram">
   <img src="docs/key-lime-pipeline.svg" alt="key lime pipeline diagram. Hann frames feed Goertzel plus harmonics and CQT chroma, then averaged chroma feeds major and minor profile matching.">
+  <figcaption>key lime global key pipeline. Hann frames feed dual chroma extraction and profile matching.</figcaption>
 </figure>
 
 <figure class="diagram">
@@ -86,14 +116,8 @@ an application can draw an overview without keeping full PCM.
 
 <figure class="diagram">
   <img src="docs/waveform-columns.svg" alt="Waveform columns diagram. Dense PCM samples are summarized into a bounded number of min, max, and RMS columns.">
+  <figcaption>Each display column stores min, max, and RMS for its slice of the waveform.</figcaption>
 </figure>
-
-## Result contract
-
-`analysis-v1` is the versioned storage contract, and each result records the
-analyzer version that produced it. Additive fields can extend the schema, while
-changed meanings require a new schema version. An application that stores results
-can later tell which files were analyzed with old logic and refresh only those.
 
 ## Current limitations
 

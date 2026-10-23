@@ -43,24 +43,37 @@ permalink: index.html
           <span class="header-badge">Rust</span>
         </a>
         <nav class="site-nav" aria-label="Project links">
-          <a class="nav-link architecture-link" href="/architecture/" aria-label="Architecture">
+          <a class="nav-link" href="/usage/" aria-label="Usage">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M5 5h6v6H5z"/>
-              <path d="M13 5h6v6h-6z"/>
-              <path d="M5 13h6v6H5z"/>
-              <path d="M13 13h6v6h-6z"/>
+              <rect x="3" y="4" width="18" height="16" rx="2"/>
+              <path d="M7 9l3 3-3 3"/>
+              <path d="M12 15h5"/>
+            </svg>
+            <span>Usage</span>
+          </a>
+          <a class="nav-link" href="/architecture/" aria-label="Architecture">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3" width="6" height="5" rx="1"/>
+              <rect x="3" y="16" width="6" height="5" rx="1"/>
+              <rect x="15" y="16" width="6" height="5" rx="1"/>
+              <path d="M12 8v4M6 16v-4h12v4"/>
             </svg>
             <span>Architecture</span>
           </a>
-          <a class="nav-link architecture-link" href="/transformer/" aria-label="Transformer">
+          <a class="nav-link" href="/transformer/" aria-label="Transformer">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 12h16"/>
-              <path d="M12 4v16"/>
-              <path d="M7 7h10v10H7z"/>
+              <path d="M7 7l3-2M7 7l3 5M7 17l3-5M7 17l3 2M14 5l3 2M14 12l3-5M14 12l3 5M14 19l3-2"/>
+              <circle cx="5" cy="7" r="2"/>
+              <circle cx="5" cy="17" r="2"/>
+              <circle cx="12" cy="5" r="2"/>
+              <circle cx="12" cy="12" r="2"/>
+              <circle cx="12" cy="19" r="2"/>
+              <circle cx="19" cy="7" r="2"/>
+              <circle cx="19" cy="17" r="2"/>
             </svg>
             <span>Transformer</span>
           </a>
-          <a class="repository-link" href="https://github.com/djpardis/trailmix" target="_blank" rel="noopener noreferrer">
+          <a class="repository-link" href="https://github.com/djpardis/trailmix" target="_blank" rel="noopener noreferrer" aria-label="Source">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 2C6.48 2 2 6.6 2 12.26c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49v-1.92c-2.78.62-3.37-1.21-3.37-1.21-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.86.09-.66.35-1.12.64-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.04 1.03-2.76-.1-.26-.45-1.3.1-2.72 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.99a9.3 9.3 0 0 1 2.5.35c1.91-1.33 2.75-1.05 2.75-1.05.55 1.42.2 2.46.1 2.72.64.72 1.03 1.64 1.03 2.76 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9v2.77c0 .27.18.59.69.49A10.26 10.26 0 0 0 22 12.26C22 6.6 17.52 2 12 2Z"/>
             </svg>
@@ -88,7 +101,7 @@ permalink: index.html
           </section>
 
           {% for section in readme.sections %}
-            {% if section.slug == "outputs" or section.slug == "how-it-works" or section.slug == "how-to-use-it" or section.slug == "backend-choices" or section.slug == "evaluation" or section.slug == "fossy-2026-talk" %}
+            {% if section.slug == "overview" or section.slug == "fossy-2026-talk" %}
               <article id="{{ section.slug }}">
                 <h2>{{ section.title }}</h2>
                 <div class="section-content">{{ section.html | safe }}</div>

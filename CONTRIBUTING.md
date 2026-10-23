@@ -44,10 +44,11 @@ npm start
 
 ## Changes to analysis output
 
-The `analysis-v1` JSON shape is the integration contract for applications that
-store results. Additive fields are acceptable within `analysis-v1`. Renaming or
-removing a field, or changing the meaning of an existing value, requires a new
-schema version and a note in [INTEGRATION.md](INTEGRATION.md).
+The serialized `Analysis` shape is the integration contract for applications
+that store results. Additive fields are acceptable within the shipped version-1
+schema. Renaming or removing a field, or changing the meaning of an existing
+value, requires a new top-level schema version and a note in
+[INTEGRATION.md](INTEGRATION.md).
 
 Changes that affect tempo, key, beat, or waveform accuracy should include a
 benchmark comparison under the same corpus, configuration, and metric
