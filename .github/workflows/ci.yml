@@ -40,6 +40,18 @@ jobs:
       - run: uv run --no-project --python 3.13 --with requests --with remotezip python -m unittest discover -s benchmarks -p 'test_*.py'
       - run: uv run --no-project --python 3.13 python -m unittest discover -s benchmarks/baselines -p 'test_*.py'
 
+  site:
+    name: Build website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
   size:
     name: Release binary size
     runs-on: ubuntu-latest

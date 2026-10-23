@@ -3,7 +3,8 @@
 //! The model reads the first [`RERANKER_MAX_FRAMES`] frame-level chroma vectors
 //! and the 24 template scores from [`crate::classify_key_scores`], and returns
 //! 24 logits in the same `tonic + 12 * mode` layout. The forward pass is plain
-//! Rust over 21,528 embedded float32 weights, so it needs no inference runtime.
+//! Rust over 21,528 embedded float32 weights, so it requires no separate
+//! inference framework.
 //!
 //! The architecture and weight order must match
 //! `scripts/export_key_reranker_weights.py`. Weights are the labels-only
