@@ -84,7 +84,7 @@ permalink: index.html
     </header>
 
     <main class="project-main">
-      <div class="project-grid">
+      <div class="project-grid single-column-grid">
 
         <div class="col-main">
 
@@ -106,18 +106,6 @@ permalink: index.html
                 <h2>{{ section.title }}</h2>
                 <div class="section-content">{{ section.html | safe }}</div>
               </article>
-            {% endif %}
-          {% endfor %}
-
-        </div>
-
-        <div class="col-side">
-
-          {% for section in readme.sections %}
-            {% if section.slug == "analyzers" %}
-              <div id="{{ section.slug }}" class="side-section">
-                {{ section.html | safe }}
-              </div>
             {% endif %}
           {% endfor %}
 
