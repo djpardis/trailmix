@@ -8,7 +8,8 @@
 ![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)
 
 **trail mix** is an audio-analysis library. It turns audio into versioned
-JSON for tempo, beats, key, key segments, and waveform display data.
+JSON for tempo, tempo segments, beat positions, key, key segments, and waveform
+display data.
 
 It is built for local analysis in music applications, library import jobs,
 playback prep, annotation tools, and MIR research workflows.
@@ -41,8 +42,25 @@ key score of about 61 on a sealed holdout. A
 [compact transformer reranker](TRANSFORMER.md) using the same pitch-class
 sequence and DSP scores raises the MIREX key score to about 74, close to larger
 learned baselines on the same corpus. The transformer is used only for global
-key selection, and its embedded Rust implementation requires no external
-model runtime.
+key selection. Its weights and forward pass are embedded in the Rust binary, so
+the release build does not require a separate inference framework.
+
+## Design principles
+
+- **Local analysis.** All analysis runs in the host application rather than a
+  remote service, so it works offline.
+- **Methods selected by measured accuracy.** Tempo, beats, waveform data,
+  chroma, and local key segments use deterministic Rust DSP. Global key uses a
+  compact transformer.
+- **No separate model runtime.** The compact transformer's weights and forward
+  pass are embedded in the Rust binary, so applications do not need to install
+  or package an inference framework such as ONNX Runtime.
+- **Small binary.** The release CLI includes common codecs, all three analyzers,
+  and the embedded key model in under 3 MB.
+- **Portable core.** The analyzer crates compile for ARM, x86, and WebAssembly.
+  File decoding is separate from the analyzer core.
+- **Inspectable outputs.** Public APIs expose confidence scores, chroma, the DSP
+  key prior, tempo and key segments, and waveform summaries.
 
 ## FOSSY 2026 talk
 

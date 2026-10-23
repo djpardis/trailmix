@@ -20,10 +20,11 @@ DSP implementation. Algorithm improvements may change estimates and confidence
 values without changing the JSON schema. The wire contract is the serialized
 `Analysis` result with top-level `version: 1`.
 
-The default integration path uses the deterministic DSP backend. First-party
-transformer or foundation-model work belongs in `trailmix-models` and can
-develop in parallel. Cueport can continue to ship the default DSP build and
-store the same version-1 `Analysis` result without bundling model checkpoints.
+The default feature set uses deterministic DSP for tempo, beats, waveform data,
+chroma, and local key segments, then applies the embedded transformer reranker
+to the global key. Applications can disable default features to use DSP for the
+global key as well. Both configurations return the same version-1 `Analysis`
+shape.
 
 External projects are benchmark baselines unless their provenance, license
 terms, artifact hashes, runtime, and output conversion have been reviewed for a
@@ -150,10 +151,10 @@ Rust desktop or server component can give trail mix the audio file, it may
 instead call `trailmix_codecs::analyze_path()` and serialize the returned
 `Analysis`.
 
-If Cueport later chooses a transformer or platform-native backend, that choice
-should be caller-supplied configuration. The stored JSON shape should remain
-the same unless the backend requires a field that cannot be represented without
-a new top-level schema version.
+If Cueport chooses the DSP-only global-key estimator or a future
+platform-native backend, that choice should be caller-supplied configuration.
+The stored JSON shape should remain the same unless the backend requires a
+field that cannot be represented without a new top-level schema version.
 
 Cueport should own:
 

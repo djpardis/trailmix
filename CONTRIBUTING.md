@@ -34,8 +34,8 @@ version is 1.85.
 ## Website
 
 The project site at [trailmix.tools](https://trailmix.tools) is generated from
-`README.md`, `ARCHITECTURE.md`, and `TRANSFORMER.md` with Eleventy. Preview
-changes with:
+`README.md`, `USAGE.md`, `ARCHITECTURE.md`, and `TRANSFORMER.md` with Eleventy.
+Preview changes with:
 
 ```sh
 npm ci

@@ -101,7 +101,7 @@ permalink: index.html
           </section>
 
           {% for section in readme.sections %}
-            {% if section.slug == "overview" or section.slug == "fossy-2026-talk" %}
+            {% if section.slug == "overview" or section.slug == "design-principles" or section.slug == "fossy-2026-talk" or section.slug == "license" %}
               <article id="{{ section.slug }}">
                 <h2>{{ section.title }}</h2>
                 <div class="section-content">{{ section.html | safe }}</div>
@@ -128,11 +128,6 @@ permalink: index.html
 
     <footer class="site-footer">
       <div class="container footer-inner">
-        {% for section in readme.sections %}
-          {% if section.slug == "license" %}
-            <div class="footer-license">{{ section.firstSentenceHtml | safe }}</div>
-          {% endif %}
-        {% endfor %}
         <p class="footer-copyright">&copy; {{ year }} trail mix</p>
       </div>
     </footer>
