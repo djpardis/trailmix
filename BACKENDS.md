@@ -12,7 +12,8 @@ feature is enabled. The reranker embeds the selected seed-1729 weights and runs
 a pure Rust forward pass, so applications do not need ONNX Runtime, a model
 server, or a native inference library.
 
-The combined result remains the `analysis-v1` JSON object. `KeyAnalysis`
+The combined result remains serialized `Analysis` with the same top-level
+schema version unless a backend needs an incompatible shape. `KeyAnalysis`
 records the estimator used for the global key and keeps the DSP key available
 for comparison.
 
@@ -39,9 +40,9 @@ already own decoding do not take codec dependencies.
 ## Future learned and platform-native analyzers
 
 `trailmix-models` defines the metadata and result contract for additional
-learned analyzers. Future backends should preserve the `analysis-v1` result
-shape or introduce a new versioned schema when the meaning of existing fields
-changes.
+learned analyzers. Future backends should preserve the shipped serialized
+`Analysis` shape or introduce a new top-level schema version when the meaning of
+existing fields changes.
 
 External projects remain benchmark baselines under `benchmarks/baselines`,
 where source revisions, artifact hashes, licenses, training disclosures,
@@ -58,7 +59,7 @@ Every backend report must include:
 - Wall-clock throughput on the same machine and thread count.
 - Model checkpoint size when the backend uses weights.
 - Runtime dependency size and required cache files.
-- Output JSON size under `analysis-v1`.
+- Output JSON size for `Analysis`.
 - Hardware support for CPU, Apple Silicon, GPU, and WebAssembly.
 - Code license, weight license, and disclosed training datasets.
 

@@ -7,6 +7,7 @@ choose the final global key from the same evidence.
 
 <figure class="diagram">
   <img src="docs/key-lime-reranker-flow.svg" alt="Flow diagram: audio produces chroma frames and DSP key scores, which feed a compact transformer reranker that outputs the selected key, estimator name, and DSP prior.">
+  <figcaption>key lime global-key reranker. Chroma frames and DSP key scores feed a compact transformer that chooses the global key.</figcaption>
 </figure>
 
 ## Why it exists
@@ -34,10 +35,34 @@ same model used for validation.
 
 ## Validation
 
-The training split uses FMAK labels with a disjoint 1,000-track FMAKv2 holdout.
-Across three seeds, the reranker raises FMAKv2 MIREX key score from 61.08 to
-73.55 and exact accuracy from 52.30 to 67.07. The selected shipping seed scores
-73.53 MIREX and 67.00 exact on the same holdout.
+Validation answers one practical question: does the small reranker
+improve global-key choice while keeping the same DSP features and output shape?
+On the sealed 1,000-track FMAKv2 holdout, the answer is yes.
+
+<div class="metric-grid">
+  <article class="metric-card">
+    <h3>DSP scorer</h3>
+    <p><strong>61.08</strong> MIREX key score</p>
+    <p><strong>52.30%</strong> exact accuracy</p>
+  </article>
+  <article class="metric-card">
+    <h3>Reranker average</h3>
+    <p><strong>73.55</strong> MIREX key score</p>
+    <p><strong>67.07%</strong> exact accuracy</p>
+  </article>
+  <article class="metric-card">
+    <h3>Shipping seed</h3>
+    <p><strong>73.53</strong> MIREX key score</p>
+    <p><strong>67.00%</strong> exact accuracy</p>
+  </article>
+</div>
+
+The reranker average is computed across three training seeds. The shipping seed
+is the seed-1729 model embedded in the Rust crate.
+
+MIREX key score gives partial credit for fifth, relative, and parallel-key
+errors, so it is more useful than exact accuracy when a model moves an estimate
+to a musically close key.
 
 <p align="center">
   <img src="docs/key-lime-accuracy-footprint.svg" alt="Scatter plot of FMAKv2 MIREX key score against installed footprint on a log scale. KL-FMAK, the transformer reranker, reaches 73.6, close to madmom and above S-KEY. KL-DSP, the deterministic scorer, reaches 61.1." width="620">
@@ -51,12 +76,6 @@ key lime scorer and KL-FMAK is the transformer reranker.
 The model, training setup, and evaluation are described in the key lime paper.
 The arXiv preprint link will be added here when the preprint is posted
 (arXiv: TBD).
-
-## Release check
-
-Before release, the public Rust crate must ship the selected reranker, match the
-ONNX reference logits, and reproduce the sealed FMAKv2 holdout claim from a
-clean checkout.
 
 ## References
 

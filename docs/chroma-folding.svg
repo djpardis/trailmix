@@ -2,24 +2,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="390" viewBox="0 0 900 390" role="img" aria-label="Chroma folding across octaves">
 
   <!-- Pitch class labels -->
-  <text x="105" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">C</text>
-  <text x="168" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">C♯</text>
-  <text x="231" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">D</text>
-  <text x="294" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">D♯</text>
-  <text x="357" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">E</text>
-  <text x="420" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">F</text>
-  <text x="483" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">F♯</text>
-  <text x="546" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">G</text>
-  <text x="609" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">G♯</text>
-  <text x="672" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">A</text>
-  <text x="735" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">A♯</text>
-  <text x="798" y="22" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">B</text>
+  <text x="105" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">C</text>
+  <text x="168" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">C♯</text>
+  <text x="231" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">D</text>
+  <text x="294" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">D♯</text>
+  <text x="357" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">E</text>
+  <text x="420" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">F</text>
+  <text x="483" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">F♯</text>
+  <text x="546" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">G</text>
+  <text x="609" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">G♯</text>
+  <text x="672" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">A</text>
+  <text x="735" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">A♯</text>
+  <text x="798" y="22" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">B</text>
 
   <!-- Octave row labels -->
-  <text x="52" y="54" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="end">oct 6</text>
-  <text x="52" y="90" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="end">oct 5</text>
-  <text x="52" y="126" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="end">oct 4</text>
-  <text x="52" y="162" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="end">oct 3</text>
+  <text x="52" y="54" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="end">oct 6</text>
+  <text x="52" y="90" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="end">oct 5</text>
+  <text x="52" y="126" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="end">oct 4</text>
+  <text x="52" y="162" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="end">oct 3</text>
 
   <!-- Grid: 12 columns x 4 rows, C-major-ish -->
   <!-- Row 1 (oct 6) -->
@@ -79,7 +79,7 @@
   <rect x="774" y="146" width="48" height="24" rx="3" fill="#f0e8df"/>
 
   <!-- Fold annotation -->
-  <text x="450" y="198" font-family="DM Sans, Arial, sans-serif" font-size="14" fill="#5a403a" text-anchor="middle">fold octaves ↓</text>
+  <text x="450" y="198" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">fold octaves ↓</text>
 
   <!-- Chroma bar chart -->
   <rect x="84" y="222" width="42" height="120" fill="#a33d52"/>
@@ -95,9 +95,9 @@
   <rect x="714" y="338" width="42" height="4" fill="#b5a08e"/>
   <rect x="777" y="332" width="42" height="10" fill="#a33d52" opacity="0.4"/>
 
-  <text x="105" y="360" font-family="DM Sans, Arial, sans-serif" font-size="16" fill="#5a403a" text-anchor="middle">C</text>
-  <text x="357" y="360" font-family="DM Sans, Arial, sans-serif" font-size="16" fill="#5a403a" text-anchor="middle">E</text>
-  <text x="546" y="360" font-family="DM Sans, Arial, sans-serif" font-size="16" fill="#5a403a" text-anchor="middle">G</text>
+  <text x="105" y="360" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">C</text>
+  <text x="357" y="360" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">E</text>
+  <text x="546" y="360" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a" text-anchor="middle">G</text>
 
-  <text x="36" y="386" font-family="DM Sans, Arial, sans-serif" font-size="16" fill="#5a403a">Strong C, E, G bins match the C major Krumhansl-Kessler profile.</text>
+  <text x="36" y="386" font-family="DM Sans, Arial, sans-serif" font-size="21" fill="#5a403a">Strong C, E, G bins match the C major Krumhansl-Kessler profile.</text>
 </svg>

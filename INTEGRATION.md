@@ -17,13 +17,13 @@ Applications may store or transmit the JSON form of that value.
 
 The production contract is the versioned JSON shape, not the current internal
 DSP implementation. Algorithm improvements may change estimates and confidence
-values without changing the JSON schema. The current wire contract is
-`analysis-v1`.
+values without changing the JSON schema. The wire contract is the serialized
+`Analysis` result with top-level `version: 1`.
 
 The default integration path uses the deterministic DSP backend. First-party
 transformer or foundation-model work belongs in `trailmix-models` and can
 develop in parallel. Cueport can continue to ship the default DSP build and
-store the same `analysis-v1` JSON without bundling model checkpoints.
+store the same version-1 `Analysis` result without bundling model checkpoints.
 
 External projects are benchmark baselines unless their provenance, license
 terms, artifact hashes, runtime, and output conversion have been reviewed for a
@@ -70,7 +70,7 @@ all component versions, not only the aggregate version:
 
 - `Analysis.version`: `1`
 - `BeatAnalysis.version`: `4`
-- `KeyAnalysis.version`: `6`
+- `KeyAnalysis.version`: `7`
 - `WaveformOverview.version`: `1`
 
 The JSON Schema for this contract is stored at
@@ -135,7 +135,8 @@ by waveform generation.
 
 ## Compatibility rules
 
-Keep `analysis-v1` stable. Publish `analysis-v2` for incompatible JSON changes.
+Keep top-level `version: 1` stable. Increment the top-level `Analysis.version`
+for incompatible JSON changes.
 
 Applications should treat confidence values as advisory for now. They can
 support ranking and UI hints, but they are not calibrated enough for hard
@@ -144,15 +145,15 @@ quality gates.
 ## Cueport integration path
 
 The stable Cueport integration remains a thin Swift/FFI binding that accepts
-mono `Float32` PCM plus a sample rate and returns `Analysis` JSON. When a Rust
-desktop or server component can give trail mix the audio file, it may instead
-call `trailmix_codecs::analyze_path()` and serialize the returned `Analysis` as
-`analysis-v1`.
+mono `Float32` PCM plus a sample rate and returns serialized `Analysis`. When a
+Rust desktop or server component can give trail mix the audio file, it may
+instead call `trailmix_codecs::analyze_path()` and serialize the returned
+`Analysis`.
 
 If Cueport later chooses a transformer or platform-native backend, that choice
 should be caller-supplied configuration. The stored JSON shape should remain
-the same unless the backend requires a new field that cannot be represented in
-`analysis-v1`.
+the same unless the backend requires a field that cannot be represented without
+a new top-level schema version.
 
 Cueport should own:
 
