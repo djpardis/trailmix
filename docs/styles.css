@@ -384,11 +384,15 @@ h3 {
 
 .document-main .section-content > p,
 .document-main .section-content > ul,
-.document-main .section-content > ol {
+.document-main .section-content > ol,
+.document-main .section-content > pre {
   max-width: 680px;
 }
 
-.single-column-grid .section-content > p {
+.single-column-grid .section-content > p,
+.single-column-grid .section-content > ul,
+.single-column-grid .section-content > ol,
+.single-column-grid .section-content > pre {
   max-width: 680px;
 }
 
