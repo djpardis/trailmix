@@ -8,8 +8,82 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Classify changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.classify.outputs.rust }}
+      benchmarks: ${{ steps.classify.outputs.benchmarks }}
+      site: ${{ steps.classify.outputs.site }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+
+          if [[ "$base" =~ ^0+$ ]]; then
+            files="$(git ls-tree -r --name-only "$head")"
+          else
+            files="$(git diff --name-only "$base" "$head")"
+          fi
+
+          rust=false
+          benchmarks=false
+          site=false
+
+          if [[ -z "$files" ]]; then
+            rust=true
+            benchmarks=true
+            site=true
+          fi
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+
+            case "$file" in
+              .github/workflows/*)
+                rust=true
+                benchmarks=true
+                site=true
+                ;;
+              Cargo.toml|Cargo.lock|crates/*|scripts/*)
+                rust=true
+                ;;
+              benchmarks/*)
+                benchmarks=true
+                ;;
+              docs/*|brand/*|README.md|ARCHITECTURE.md|BACKENDS.md|CONTRIBUTING.md|INTEGRATION.md|RELEASE.md|THIRD_PARTY.md|TRANSFORMER.md|USAGE.md|eleventy.config.js|package.json|package-lock.json)
+                site=true
+                ;;
+              *)
+                rust=true
+                benchmarks=true
+                site=true
+                ;;
+            esac
+          done <<< "$files"
+
+          {
+            echo "rust=$rust"
+            echo "benchmarks=$benchmarks"
+            echo "site=$site"
+          } >> "$GITHUB_OUTPUT"
+
   test:
     name: Test on ${{ matrix.os }}
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -22,6 +96,8 @@ jobs:
 
   lint:
     name: Format and lint
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +109,8 @@ jobs:
 
   benchmark-scripts:
     name: Benchmark script tests
+    needs: changes
+    if: needs.changes.outputs.benchmarks == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +120,8 @@ jobs:
 
   site:
     name: Build website
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +134,8 @@ jobs:
 
   size:
     name: Release binary size
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
