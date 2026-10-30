@@ -72,7 +72,8 @@ the compact key reranker, so its key results use the DSP-only estimator.
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local checks, data rules, and commit
-style, and [RELEASE.md](RELEASE.md) for the release process.
+style, [RELEASE.md](RELEASE.md) for the release process, and
+[ROADMAP.md](ROADMAP.md) for near-term evaluation and reproducibility work.
 
 ## License
 
