@@ -18,11 +18,11 @@ audio-analysis features.
 
 ## Overview
 
-trail mix is a local audio-analysis library. It has three independent analyzers
-for tempo and beats, key, and waveform. All three accept decoded mono PCM. The
-combined API runs them together and returns an aggregate result.
-[Usage](USAGE.md) documents these interfaces, and
-[Architecture](ARCHITECTURE.md) describes their execution and result types.
+The library has three independent analyzers for tempo and beats, key, and
+waveform. All three accept decoded mono PCM. The combined API runs them
+together and returns an aggregate result. [Usage](USAGE.md) documents these
+interfaces, and [Architecture](ARCHITECTURE.md) describes their execution
+and result types.
 
 Tempo and beat tracking use deterministic DSP. A 24-band spectral-flux onset
 function feeds autocorrelation-based tempo estimation and dynamic-programming
@@ -55,8 +55,8 @@ the release build does not require a separate inference framework.
 - **No separate model runtime.** The compact transformer's weights and forward
   pass are embedded in the Rust binary, so applications do not need to install
   or package an inference framework such as ONNX Runtime.
-- **Small binary.** The release CLI includes common codecs, all three analyzers,
-  and the embedded key model in under 3 MB.
+- **Single binary.** The release CLI includes common codecs, all three analyzers,
+  and the embedded key model with no external files or downloads.
 - **Portable core.** The analyzer crates compile for ARM, x86, and WebAssembly.
   File decoding is separate from the analyzer core.
 - **Inspectable outputs.** Public APIs expose confidence scores, chroma, the DSP
@@ -72,7 +72,8 @@ the compact key reranker, so its key results use the DSP-only estimator.
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local checks, data rules, and commit
-style, and [RELEASE.md](RELEASE.md) for the release process.
+style, [RELEASE.md](RELEASE.md) for the release process, and
+[ROADMAP.md](ROADMAP.md) for near-term evaluation and reproducibility work.
 
 ## License
 
