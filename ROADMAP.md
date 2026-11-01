@@ -6,10 +6,12 @@ engineering and evaluation tasks.
 
 ## Reproducible key-model releases
 
-- Measure the embedded Rust key lime backend with the selected paper weights.
-  Record binary size, embedded weight size, total installed size, latency, and
-  exact agreement against the archived ONNX artifact before citing the smaller
-  Rust package size in public results.
+- Measure the embedded Rust key lime backend with the selected paper weights as
+  a versioned release artifact, not only as the current size arithmetic.
+  Record the exact commit or tag, stripped and unstripped binary size, whether
+  codecs are included, embedded weight size, total installed size, latency, and
+  exact agreement against the archived ONNX artifact on the sealed holdout
+  before citing the smaller Rust package size in public results.
 
 - Add a release audit command for paper-facing tags. The audit should verify the
   tag target, release notes, artifact hashes, split fingerprints, schema
