@@ -5,6 +5,7 @@
 # trail mix
 
 [![CI](https://github.com/djpardis/trailmix/actions/workflows/ci.yml/badge.svg)](https://github.com/djpardis/trailmix/actions/workflows/ci.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23866516.svg)](https://doi.org/10.5281/zenodo.23866516)
 ![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)
 
 **trail mix** is an audio-analysis library. It turns audio into versioned
