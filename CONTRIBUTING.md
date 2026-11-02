@@ -42,6 +42,23 @@ npm ci
 npm start
 ```
 
+## Fast documentation changes
+
+CI classifies a pull request by changed file names. Keep paper-artifact,
+release-note, and website wording in documentation files such as `README.md`,
+`RELEASE.md`, `TRANSFORMER.md`, `USAGE.md`, `ARCHITECTURE.md`, and `docs/*`
+unless the source behavior actually changes.
+
+Do not add comments under `crates/*` only to explain a public paper artifact.
+That turns a docs-only pull request into a Rust change, which correctly triggers
+the full Rust matrix, Clippy, tests, and binary-size job. If a source comment is
+needed because the code behavior would be unclear without it, keep the comment
+and run the full local Rust checks before pushing.
+
+For docs/site-only pull requests, run `npm run build` locally and confirm that
+the PR checks skip Rust tests, Rust lint, benchmark tests, and binary size while
+the website build and CI gate pass.
+
 ## Changes to analysis output
 
 The serialized `Analysis` shape is the integration contract for applications

@@ -114,6 +114,45 @@ Create a GitHub release for the tag after crates.io publishing succeeds. Include
 - Important benchmark or validation artifacts by link, not generated local data.
 - License and third-party notice changes, if any.
 
+## Paper reproducibility releases
+
+When a paper or preprint cites trail mix as the public implementation, the
+release tag must make the cited code, model state, and evidence trail
+recoverable without publishing private datasets, private manifests, or generated
+bulk outputs.
+
+Use the normal semver tag for implementation releases, such as `v0.1.0-alpha.2`
+or `v0.1.0`. If the paper needs to cite an evidence revision rather than a
+crate release, use an annotated paper tag with a descriptive title-derived name,
+for example `key-lime-paper-v1`. Do not include venue names in paper tags.
+
+Before citing a trail mix release from arXiv or a paper artifact, confirm that
+the release notes record:
+
+- The paper or preprint title.
+- The trail mix tag and full commit SHA.
+- The crate versions included in the release.
+- The `analysis-v1` schema version and component output versions.
+- The selected key model identifier, weight source, and any artifact hashes.
+- The evaluation split fingerprint, seeds, and source revisions used by the
+  paper-facing evidence.
+- Links to public scripts or evidence summaries needed to reproduce figures,
+  with private audio, private manifests, and generated bulk outputs excluded.
+- The exact local checks and GitHub Actions run that passed for the tag.
+
+When the paper text needs a public implementation link, cite the tag URL rather
+than the moving `main` branch:
+
+```text
+https://github.com/djpardis/trailmix/releases/tag/key-lime-paper-v1
+```
+
+If the paper reports numbers from an ONNX export but the release uses the
+embedded Rust forward pass, state both facts in the release notes. The release
+notes should say that the Rust implementation matches the ONNX reference logits
+and sealed-holdout predictions before replacing the ONNX Runtime packaging in a
+public build.
+
 ## Updating Cueport
 
 Until the crates.io release, Cueport should consume trail mix with explicit git

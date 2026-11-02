@@ -64,7 +64,7 @@ jobs:
               benchmarks/*)
                 benchmarks=true
                 ;;
-              docs/*|brand/*|README.md|ARCHITECTURE.md|BACKENDS.md|CONTRIBUTING.md|INTEGRATION.md|RELEASE.md|THIRD_PARTY.md|TRANSFORMER.md|USAGE.md|eleventy.config.js|package.json|package-lock.json)
+              docs/*|brand/*|README.md|ARCHITECTURE.md|BACKENDS.md|CONTRIBUTING.md|INTEGRATION.md|RELEASE.md|ROADMAP.md|THIRD_PARTY.md|TRANSFORMER.md|USAGE.md|eleventy.config.js|package.json|package-lock.json)
                 site=true
                 ;;
               *)
