@@ -51,14 +51,15 @@ On the sealed 1,000-track FMAKv2 holdout, the answer is yes.
     <p><strong>67.07%</strong> exact accuracy</p>
   </article>
   <article class="metric-card">
-    <h3>Shipping seed</h3>
+    <h3>Selected model</h3>
     <p><strong>73.53</strong> MIREX key score</p>
     <p><strong>67.00%</strong> exact accuracy</p>
   </article>
 </div>
 
-The reranker average is computed across three training seeds. The shipping seed
-is the seed-1729 model embedded in the Rust crate.
+The reranker average is computed across three training seeds. The selected model
+is the seed-1729 artifact used for runtime and release checks; the paper's
+headline row remains the three-seed average.
 
 MIREX key score gives partial credit for fifth, relative, and parallel-key
 errors, so it is more useful than exact accuracy when a model moves an estimate
