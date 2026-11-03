@@ -75,8 +75,8 @@ key lime scorer and KL-FMAK is the transformer reranker.
 ## Paper
 
 The model, training setup, and evaluation are described in the key lime paper.
-The arXiv preprint link will be added here when the preprint is posted
-(arXiv: TBD).
+The preprint is available at
+[arXiv:2611.02408](https://arxiv.org/abs/2611.02408).
 
 ## References
 
