@@ -63,12 +63,15 @@ the release build does not require a separate inference framework.
 - **Inspectable outputs.** Public APIs expose confidence scores, chroma, the DSP
   key prior, tempo and key segments, and waveform summaries.
 
-## FOSSY 2026 talk
+## Research
 
-The FOSSY 2026 talk,
-[trail mix: Open tempo, key, and waveform analysis](https://djpardis.com/talks/trail-mix-fossy-2026/),
-introduces the DSP analysis for tempo, beat, key, and waveform data. It predates
-the compact key reranker, so its key results use the DSP-only estimator.
+- Noorzad, P. (2026). [Deployment-constrained key estimation with a DSP-guided
+  transformer reranker](https://arxiv.org/abs/2611.02408). arXiv preprint.
+- Noorzad, P. (2026). [trail mix: DSP analysis with a compact transformer key
+  reranker](https://djpardis.com/talks/trail-mix-ieee-ubc-2026/). UBC IEEE
+  Lunch and Learn, October 26.
+- Noorzad, P. (2026). [trail mix: Open tempo, key, and waveform
+  analysis](https://djpardis.com/talks/trail-mix-fossy-2026/). FOSSY, August 9.
 
 ## Contributing
 

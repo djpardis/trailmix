@@ -101,7 +101,7 @@ permalink: index.html
           </section>
 
           {% for section in readme.sections %}
-            {% if section.slug == "overview" or section.slug == "design-principles" or section.slug == "fossy-2026-talk" or section.slug == "license" %}
+            {% if section.slug == "overview" or section.slug == "design-principles" or section.slug == "research" or section.slug == "license" %}
               <article id="{{ section.slug }}">
                 <h2>{{ section.title }}</h2>
                 <div class="section-content">{{ section.html | safe }}</div>
