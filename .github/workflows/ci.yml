@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,12 +29,15 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             base="${{ github.event.pull_request.base.sha }}"
             head="${{ github.event.pull_request.head.sha }}"
-          else
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
             base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          else
+            base="0000000000000000000000000000000000000000"
             head="${{ github.sha }}"
           fi
 
-          if [[ "$base" =~ ^0+$ ]]; then
+          if [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
             files="$(git ls-tree -r --name-only "$head")"
           else
             files="$(git diff --name-only "$base" "$head")"
